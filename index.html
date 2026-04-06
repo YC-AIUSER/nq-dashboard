@@ -751,6 +751,37 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
 .hypo-compare-row:last-child { border-bottom: none; }
 .hypo-compare-head { color: var(--text-3); font-weight: 600; text-transform: uppercase; font-size: 11px; }
 
+/* ──────── User Select ──────── */
+.user-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.user-item:hover { border-color: var(--accent); }
+.user-item.active { border-color: var(--accent); background: var(--accent-s); }
+.user-item .ui-avatar {
+  width: 28px; height: 28px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; color: #fff;
+  flex-shrink: 0;
+}
+.user-item .ui-name { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+.user-item .ui-meta { font-size: 11px; color: var(--text-3); }
+.user-item .ui-del {
+  background: none; border: none; color: var(--text-3); cursor: pointer;
+  font-size: 12px; padding: 2px 6px; border-radius: 3px; transition: color 0.15s;
+}
+.user-item .ui-del:hover { color: var(--red); }
+
 /* ══════════════════════════════════════════ VAULT / OBSIDIAN ═══ */
 .vault-bar {
   padding: 8px 14px 0;
@@ -1025,6 +1056,11 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
   </nav>
 
   <div class="sidebar-footer" style="padding:14px 16px 0;border-top:1px solid var(--border)">
+    <div class="sync-row" style="margin-bottom:10px">
+      <div style="width:24px;height:24px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0" id="user-avatar">?</div>
+      <span class="sync-lbl" id="user-name-lbl" style="font-weight:600;color:var(--text)">未登录</span>
+      <button class="sync-btn" onclick="openUserModal()">切换</button>
+    </div>
     <div class="sidebar-date" style="padding-bottom:12px">
       <strong id="sb-date">—</strong>
       <span id="sb-weekday">—</span>
@@ -1488,6 +1524,24 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
 
 </main>
 
+<!-- ══ User Select Modal ══ -->
+<div class="modal-bg" id="user-modal">
+  <div class="modal">
+    <div class="modal-title">选择用户</div>
+    <div class="modal-desc">每位用户有独立的交易数据、假设和同步配置。</div>
+    <div id="user-list-wrap"></div>
+    <div class="modal-sep"></div>
+    <div class="field">
+      <label>新建用户</label>
+      <input type="text" id="user-new-name" placeholder="输入昵称" maxlength="20" autocomplete="off">
+    </div>
+    <div class="modal-btns">
+      <button class="mbtn-ok" onclick="createUser()">创建并登录</button>
+      <button class="mbtn-cancel" id="user-modal-cancel" onclick="closeUserModal()">取消</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ Sync Setup Modal ══ -->
 <div class="modal-bg" id="sync-modal">
   <div class="modal">
@@ -1533,13 +1587,96 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
 <div class="toast" id="toast"></div>
 
 <script>
-/* ═══════════════════════════════════════════ DATA ═══ */
-const KEY = 'nq_trades_v1';
+/* ═══════════════════════════════════════════ USER ═══ */
+const USERS_KEY = 'nq_users';
+const CURRENT_USER_KEY = 'nq_current_user';
 
-const load = () => { try { return JSON.parse(localStorage.getItem(KEY)||'[]'); } catch { return []; } };
-const save = t  => { localStorage.setItem(KEY, JSON.stringify(t)); syncPush(); };
+function getUsers() { try { return JSON.parse(localStorage.getItem(USERS_KEY)||'[]'); } catch { return []; } }
+function setUsers(u) { localStorage.setItem(USERS_KEY, JSON.stringify(u)); }
+function getCurrentUser() { return localStorage.getItem(CURRENT_USER_KEY) || ''; }
+function setCurrentUser(name) { localStorage.setItem(CURRENT_USER_KEY, name); }
+
+function userPrefix() { const u = getCurrentUser(); return u ? u + '_' : ''; }
+
+/* ═══════════════════════════════════════════ DATA ═══ */
+function KEY()      { return userPrefix() + 'nq_trades_v1'; }
+
+const load = () => { try { return JSON.parse(localStorage.getItem(KEY())||'[]'); } catch { return []; } };
+const save = t  => { localStorage.setItem(KEY(), JSON.stringify(t)); syncPush(); };
 const todayStr  = () => new Date().toISOString().slice(0,10);
 const formDate  = () => document.getElementById('f-date').value || todayStr();
+
+/* ═══════════════════════════════════════ USER MGMT ═══ */
+function updateUserUI() {
+  const name = getCurrentUser();
+  document.getElementById('user-name-lbl').textContent = name || '未登录';
+  document.getElementById('user-avatar').textContent = name ? name[0].toUpperCase() : '?';
+}
+
+function openUserModal() {
+  renderUserList();
+  document.getElementById('user-modal').classList.add('open');
+  // Hide cancel if no user set (first time)
+  document.getElementById('user-modal-cancel').style.display = getCurrentUser() ? '' : 'none';
+}
+
+function closeUserModal() {
+  document.getElementById('user-modal').classList.remove('open');
+}
+
+function renderUserList() {
+  const users = getUsers();
+  const current = getCurrentUser();
+  const wrap = document.getElementById('user-list-wrap');
+  if (!users.length) {
+    wrap.innerHTML = '<div class="empty-msg" style="padding:12px 0">暂无用户，请创建一个</div>';
+    return;
+  }
+  wrap.innerHTML = users.map(u => {
+    const cls = u === current ? 'user-item active' : 'user-item';
+    return `<div class="${cls}" onclick="switchUser('${u.replace(/'/g,"\\'")}')">
+      <div class="ui-avatar">${u[0].toUpperCase()}</div>
+      <div class="ui-name">${u}</div>
+      ${u === current ? '<div class="ui-meta">当前</div>' : ''}
+      <button class="ui-del" onclick="event.stopPropagation();deleteUser('${u.replace(/'/g,"\\'")}')">删除</button>
+    </div>`;
+  }).join('');
+}
+
+function createUser() {
+  const name = document.getElementById('user-new-name').value.trim();
+  if (!name) return toast('请输入昵称', 'err');
+  const users = getUsers();
+  if (users.includes(name)) return toast('用户已存在', 'err');
+  users.push(name);
+  setUsers(users);
+  document.getElementById('user-new-name').value = '';
+  switchUser(name);
+}
+
+function switchUser(name) {
+  setCurrentUser(name);
+  updateUserUI();
+  closeUserModal();
+  // Reload all data views
+  renderTodayList();
+  resetTradeNo();
+  renderHypoEntryFields();
+  syncInit();
+  toast('✓ 已切换到 ' + name);
+}
+
+function deleteUser(name) {
+  if (!confirm('删除用户 "' + name + '"？\n该用户的交易数据将保留在浏览器中，但不再出现在用户列表。')) return;
+  const users = getUsers().filter(u => u !== name);
+  setUsers(users);
+  if (getCurrentUser() === name) {
+    setCurrentUser(users.length ? users[0] : '');
+    if (users.length) switchUser(users[0]);
+    else { updateUserUI(); openUserModal(); }
+  }
+  renderUserList();
+}
 
 /* ═══════════════════════════════════════════ INIT ═══ */
 const WEEKDAYS = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
@@ -1550,6 +1687,31 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('sb-date').textContent =
     `${now.getFullYear()} 年 ${MONTHS[now.getMonth()]} ${now.getDate()} 日`;
   document.getElementById('sb-weekday').textContent = WEEKDAYS[now.getDay()];
+
+  // User check — show modal if no user
+  updateUserUI();
+  if (!getCurrentUser()) {
+    // Migrate: if data exists without prefix, this is a first-time upgrade
+    const oldTrades = localStorage.getItem('nq_trades_v1');
+    if (oldTrades) {
+      // Auto-create default user with existing data
+      const defaultName = '默认用户';
+      setUsers([defaultName]);
+      setCurrentUser(defaultName);
+      // Move old keys to prefixed keys
+      ['nq_trades_v1','nq_hypotheses_v1','nq_hypo_obs_v1','nq_sync_v1'].forEach(k => {
+        const val = localStorage.getItem(k);
+        if (val) {
+          localStorage.setItem(defaultName + '_' + k, val);
+          localStorage.removeItem(k);
+        }
+      });
+      updateUserUI();
+      toast('已迁移数据到用户：' + defaultName);
+    } else {
+      openUserModal();
+    }
+  }
 
   document.getElementById('f-date').value = todayStr();
   resetTradeNo();
@@ -1570,6 +1732,11 @@ window.addEventListener('DOMContentLoaded', () => {
   syncInit();
   initVault();
   initPasteHandler();
+
+  // Close user modal on bg click
+  document.getElementById('user-modal').addEventListener('click', e => {
+    if (e.target.id === 'user-modal' && getCurrentUser()) closeUserModal();
+  });
 });
 
 function resetTradeNo() {
@@ -2061,14 +2228,14 @@ function renderBE(trades) {
 }
 
 /* ═══════════════════════════════════════════ HYPOTHESIS ═══ */
-const HYPO_KEY = 'nq_hypotheses_v1';
-const HYPO_OBS_KEY = 'nq_hypo_obs_v1';
+function HYPO_KEY() { return userPrefix() + 'nq_hypotheses_v1'; }
+function HYPO_OBS_KEY() { return userPrefix() + 'nq_hypo_obs_v1'; }
 const HYPO_CHECKPOINT_1 = 30, HYPO_CHECKPOINT_2 = 100;
 
-const loadHypos = () => { try { return JSON.parse(localStorage.getItem(HYPO_KEY)||'[]'); } catch { return []; } };
-const saveHypos = h  => { localStorage.setItem(HYPO_KEY, JSON.stringify(h)); syncPush(); };
-const loadObs   = () => { try { return JSON.parse(localStorage.getItem(HYPO_OBS_KEY)||'[]'); } catch { return []; } };
-const saveObs   = o  => { localStorage.setItem(HYPO_OBS_KEY, JSON.stringify(o)); syncPush(); };
+const loadHypos = () => { try { return JSON.parse(localStorage.getItem(HYPO_KEY())||'[]'); } catch { return []; } };
+const saveHypos = h  => { localStorage.setItem(HYPO_KEY(), JSON.stringify(h)); syncPush(); };
+const loadObs   = () => { try { return JSON.parse(localStorage.getItem(HYPO_OBS_KEY())||'[]'); } catch { return []; } };
+const saveObs   = o  => { localStorage.setItem(HYPO_OBS_KEY(), JSON.stringify(o)); syncPush(); };
 
 function addHypothesis() {
   const id   = document.getElementById('hypo-new-id').value.trim();
@@ -2925,10 +3092,10 @@ function downloadReview() {
 }
 
 /* ═══════════════════════════════════════════ SYNC ═══ */
-const SYNC_KEY = 'nq_sync_v1';      // { token, gistId }
+function SYNC_KEY() { return userPrefix() + 'nq_sync_v1'; }  // { token, gistId }
 
-function syncCfg()  { try { return JSON.parse(localStorage.getItem(SYNC_KEY)||'null'); } catch { return null; } }
-function syncSave(cfg) { localStorage.setItem(SYNC_KEY, JSON.stringify(cfg)); }
+function syncCfg()  { try { return JSON.parse(localStorage.getItem(SYNC_KEY())||'null'); } catch { return null; } }
+function syncSave(cfg) { localStorage.setItem(SYNC_KEY(), JSON.stringify(cfg)); }
 
 function setSyncStatus(state, label) {
   const dot = document.getElementById('sync-dot');
@@ -2971,7 +3138,7 @@ async function syncPullNow(cfg) {
   const tradesContent = gist.files?.['nq_trades.json']?.content;
   if (tradesContent) {
     const merged = mergeById(load(), JSON.parse(tradesContent));
-    localStorage.setItem(KEY, JSON.stringify(merged));
+    localStorage.setItem(KEY(), JSON.stringify(merged));
   }
 
   // Hypotheses
@@ -3117,7 +3284,7 @@ async function connectSync() {
 
 function disconnectSync() {
   if (!confirm('断开同步并清除本机 Token？（不影响 Gist 上的数据）')) return;
-  localStorage.removeItem(SYNC_KEY);
+  localStorage.removeItem(SYNC_KEY());
   setSyncStatus('idle', '未配置同步');
   closeSyncModal();
   toast('已断开同步');
@@ -3134,7 +3301,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function clearAll() {
   if (!confirm('确认清空所有交易数据？此操作不可恢复。')) return;
   if (!confirm('再次确认：将永久删除所有数据？')) return;
-  localStorage.removeItem(KEY);
+  localStorage.removeItem(KEY());
   renderTodayList();
   toast('已清空所有数据');
 }
