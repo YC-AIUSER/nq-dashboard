@@ -652,6 +652,34 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
 /* ──────── Divider ──────── */
 .divider { height: 1px; background: var(--border); margin: 4px 0 12px; }
 
+/* ──────── Risk Alerts ──────── */
+.risk-alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--r-sm);
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.risk-alert .ra-icon { font-size: 16px; flex-shrink: 0; }
+.risk-alert-warn {
+  background: var(--yellow-s);
+  border: 1px solid rgba(201,151,62,0.3);
+  color: var(--yellow);
+}
+.risk-alert-danger {
+  background: var(--red-s);
+  border: 1px solid rgba(217,92,92,0.3);
+  color: var(--red);
+}
+.risk-alert-ok {
+  background: var(--green-s);
+  border: 1px solid rgba(77,184,122,0.25);
+  color: var(--green);
+}
+
 /* ══════════════════════════════════════════ VAULT / OBSIDIAN ═══ */
 .vault-bar {
   padding: 8px 14px 0;
@@ -1057,7 +1085,16 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
       <!-- 市场环境 -->
       <div class="card">
         <div class="card-title">市场环境</div>
-        <div class="form-grid g3">
+        <div class="form-grid g4">
+          <div class="field">
+            <label>小时偏见</label>
+            <div class="seg-ctrl" id="bias-group">
+              <button class="seg-btn" data-val="bullish" onclick="seg(this,'bias-group','s-long')">▲ 多头</button>
+              <button class="seg-btn" data-val="bearish" onclick="seg(this,'bias-group','s-short')">▼ 空头</button>
+              <button class="seg-btn" data-val="neutral" onclick="seg(this,'bias-group','s-neutral')">中性</button>
+            </div>
+            <input type="hidden" id="f-bias">
+          </div>
           <div class="field">
             <label>日类型</label>
             <div class="seg-ctrl" id="daytype-group">
@@ -1092,13 +1129,23 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
       <!-- 标记 -->
       <div class="card">
         <div class="card-title">标记</div>
-        <div class="form-grid g3">
+        <div class="form-grid g4">
           <div class="field">
             <label>计划内交易</label>
             <div class="toggle-row">
               <label for="f-planned" id="planned-lbl" style="cursor:pointer">否</label>
               <label class="switch">
                 <input type="checkbox" id="f-planned">
+                <span class="switch-track"></span>
+              </label>
+            </div>
+          </div>
+          <div class="field">
+            <label>偏见-IB 冲突</label>
+            <div class="toggle-row">
+              <label for="f-bias-conflict" id="bias-conflict-lbl" style="cursor:pointer">否</label>
+              <label class="switch">
+                <input type="checkbox" id="f-bias-conflict">
                 <span class="switch-track"></span>
               </label>
             </div>
@@ -1151,6 +1198,7 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
   <!-- ─── PAGE: 今日汇总 ─── -->
   <div class="page" id="page-today">
     <div style="max-width:900px">
+      <div id="risk-alerts"></div>
       <div class="stat-grid sg-4" id="today-cards-a"></div>
       <div class="stat-grid sg-4" id="today-cards-b"></div>
     </div>
@@ -1350,6 +1398,9 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('f-planned').addEventListener('change', function() {
     document.getElementById('planned-lbl').textContent = this.checked ? '是' : '否';
   });
+  document.getElementById('f-bias-conflict').addEventListener('change', function() {
+    document.getElementById('bias-conflict-lbl').textContent = this.checked ? '是' : '否';
+  });
   document.getElementById('f-be-swept').addEventListener('change', function() {
     document.getElementById('be-lbl').textContent = this.checked ? '是' : '否';
   });
@@ -1391,7 +1442,7 @@ function nav(btn, name) {
 function seg(btn, gid, cls) {
   document.getElementById(gid).querySelectorAll('.seg-btn').forEach(b => b.className = 'seg-btn');
   btn.classList.add(cls);
-  const map = { 'dir-group':'f-direction', 'daytype-group':'f-day-type', 'gex-group':'f-gex' };
+  const map = { 'dir-group':'f-direction', 'daytype-group':'f-day-type', 'gex-group':'f-gex', 'bias-group':'f-bias' };
   if (map[gid]) document.getElementById(map[gid]).value = btn.dataset.val;
 }
 
@@ -1471,6 +1522,8 @@ function submitTrade() {
     gex:        document.getElementById('f-gex').value,
     ibWidth:    parseFloat(document.getElementById('f-ib-width').value) || 0,
     session:    document.getElementById('f-session').value,
+    bias:       document.getElementById('f-bias').value,
+    biasConflict: document.getElementById('f-bias-conflict').checked,
     planned:    document.getElementById('f-planned').checked,
     beSwept:    document.getElementById('f-be-swept').checked,
     postSweep:  document.getElementById('f-post-sweep').value,
@@ -1500,16 +1553,19 @@ function clearForm() {
     el.value = ''; el.className = '';
   });
   document.getElementById('f-planned').checked  = false;
+  document.getElementById('f-bias-conflict').checked = false;
   document.getElementById('f-be-swept').checked = false;
   document.getElementById('f-post-sweep').value = 'na';
   document.getElementById('planned-lbl').textContent = '否';
+  document.getElementById('bias-conflict-lbl').textContent = '否';
   document.getElementById('be-lbl').textContent      = '否';
-  ['dir-group','daytype-group','gex-group'].forEach(gid =>
+  ['dir-group','daytype-group','gex-group','bias-group'].forEach(gid =>
     document.getElementById(gid).querySelectorAll('.seg-btn').forEach(b => b.className = 'seg-btn')
   );
   document.getElementById('f-direction').value = '';
   document.getElementById('f-day-type').value  = '';
   document.getElementById('f-gex').value       = '';
+  document.getElementById('f-bias').value      = '';
   document.getElementById('f-trade-no').value  = load().filter(t => t.date === d).length + 1;
 }
 
@@ -1522,6 +1578,7 @@ function deleteTrade(id) {
 
 /* ═══════════════════════════════════════════ RENDER: LIST ═══ */
 const KEY_LVL_ZH  = { high_delta:'高成交量Delta', vp_poc:'VP密集区', vp_hvn:'VP高节点', vp_val:'VP下沿', vp_vah:'VP上沿', overlap:'重叠区', cost_zone:'成本区' };
+const BIAS_ZH     = { bullish:'多头偏见', bearish:'空头偏见', neutral:'中性' };
 const ENTRY_ZH    = { absorption:'吸筹', exhaustion:'竭尽', trapped:'套牢' };
 const DAYTYPE_ZH  = { trend:'趋势日', range:'震荡日', neutral:'中性日' };
 const GEX_ZH      = { positive:'正GEX', negative:'负GEX', neutral:'中性' };
@@ -1538,8 +1595,8 @@ function renderTodayList() {
 
   let h = `<table><thead><tr>
     <th>#</th><th>方向</th><th>入场价</th><th>出场价</th><th>止损价</th>
-    <th>盈亏点</th><th>R值</th><th>关键位</th><th>入场类型</th>
-    <th>日类型</th><th>计划内</th><th>情绪</th><th>备注</th><th></th>
+    <th>盈亏点</th><th>R值</th><th>关键位</th><th>偏见</th>
+    <th>日类型</th><th>计划内</th><th>冲突</th><th>备注</th><th></th>
   </tr></thead><tbody>`;
 
   dt.forEach(t => {
@@ -1560,10 +1617,10 @@ function renderTodayList() {
       <td class="${pc} c-num">${t.pnl >= 0?'+':''}${t.pnl.toFixed(2)}</td>
       <td class="${pc} c-num">${t.r >= 0?'+':''}${t.r.toFixed(2)}R</td>
       <td class="c-dim">${KEY_LVL_ZH[t.keyLevel]||t.keyLevel||'—'}</td>
-      <td class="c-dim">${ENTRY_ZH[t.entryType]||t.entryType||'—'}</td>
+      <td class="c-dim">${BIAS_ZH[t.bias]||t.bias||'—'}</td>
       <td class="c-dim">${DAYTYPE_ZH[t.dayType]||t.dayType||'—'}</td>
       <td>${plan}</td>
-      <td class="c-dim">${EMOTION_ZH[t.emotion]||t.emotion||'—'}</td>
+      <td class="c-dim">${t.biasConflict ? '<span style="color:var(--yellow)">⚠</span>' : '—'}</td>
       <td class="c-dim" style="max-width:140px;overflow:hidden;text-overflow:ellipsis">${t.notes||'—'}</td>
       <td><button class="btn-del" onclick="deleteTrade('${t.id}')">删除</button></td>
     </tr>`;
@@ -1603,11 +1660,74 @@ function mkCard(label, val, sub, cls) {
   </div>`;
 }
 
+/* ═══════════════════════════════════════════ RISK ALERTS ═══ */
+const RISK = { MAX_DAILY_TRADES: 6, MAX_CONSEC_LOSS: 3, COOLDOWN_MIN: 30 };
+
+function renderRiskAlerts(dt) {
+  const el = document.getElementById('risk-alerts');
+  if (!dt.length) { el.innerHTML = ''; return; }
+  let html = '';
+
+  // Daily trade count
+  if (dt.length >= RISK.MAX_DAILY_TRADES) {
+    html += `<div class="risk-alert risk-alert-danger">
+      <span class="ra-icon">🚫</span>
+      已达每日最大交易次数（${RISK.MAX_DAILY_TRADES} 笔），今日停手
+    </div>`;
+  } else if (dt.length >= RISK.MAX_DAILY_TRADES - 1) {
+    html += `<div class="risk-alert risk-alert-warn">
+      <span class="ra-icon">⚠</span>
+      已交易 ${dt.length} 笔，仅剩 ${RISK.MAX_DAILY_TRADES - dt.length} 笔额度
+    </div>`;
+  }
+
+  // Consecutive losses (check last N trades)
+  const sorted = [...dt].sort((a,b) => a.timestamp - b.timestamp);
+  let consecLoss = 0;
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    if (sorted[i].pnl <= 0) consecLoss++;
+    else break;
+  }
+  if (consecLoss >= RISK.MAX_CONSEC_LOSS) {
+    html += `<div class="risk-alert risk-alert-danger">
+      <span class="ra-icon">🛑</span>
+      连续亏损 ${consecLoss} 笔 — 触发熔断，暂停 ${RISK.COOLDOWN_MIN} 分钟
+    </div>`;
+  } else if (consecLoss === RISK.MAX_CONSEC_LOSS - 1) {
+    html += `<div class="risk-alert risk-alert-warn">
+      <span class="ra-icon">⚠</span>
+      已连续亏损 ${consecLoss} 笔，再亏 1 笔将触发熔断
+    </div>`;
+  }
+
+  // Bias-IB conflict day
+  const hasConflict = dt.some(t => t.biasConflict);
+  if (hasConflict && dt.length >= 1) {
+    const conflictTrades = dt.filter(t => t.biasConflict).length;
+    html += `<div class="risk-alert risk-alert-warn">
+      <span class="ra-icon">⚡</span>
+      偏见-IB 冲突日 — 规则限制最多 1 笔交易（当前 ${conflictTrades} 笔冲突标记）
+    </div>`;
+  }
+
+  // All clear
+  if (!html && dt.length > 0) {
+    html = `<div class="risk-alert risk-alert-ok">
+      <span class="ra-icon">✓</span>
+      风控正常 · ${dt.length}/${RISK.MAX_DAILY_TRADES} 笔 · 连亏 ${consecLoss}/${RISK.MAX_CONSEC_LOSS}
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
 /* ═══════════════════════════════════════════ RENDER: TODAY ═══ */
 function renderTodayStats() {
   const d  = todayStr();
   const dt = load().filter(t => t.date === d);
   const s  = calcStats(dt);
+
+  renderRiskAlerts(dt);
 
   const ca = document.getElementById('today-cards-a');
   const cb = document.getElementById('today-cards-b');
@@ -1730,6 +1850,7 @@ function groupCard(title, trades, keyFn, labelMap) {
 
 function renderGroups(trades) {
   document.getElementById('group-grid').innerHTML =
+    groupCard('按小时偏见',  trades, t=>t.bias,       BIAS_ZH) +
     groupCard('按日类型',   trades, t=>t.dayType,   DAYTYPE_ZH) +
     groupCard('按 GEX 环境', trades, t=>t.gex,       GEX_ZH) +
     groupCard('按关键位类型', trades, t=>t.keyLevel,  KEY_LVL_ZH) +
@@ -1778,7 +1899,7 @@ function renderBE(trades) {
 const CSV_COLS = [
   'id','date','tradeNo','direction','entryTime','entryPrice','stopPrice',
   'exitPrice','exitTime','pnl','r','keyLevel','entryType','dayType','gex',
-  'ibWidth','session','planned','beSwept','postSweep','emotion','notes','timestamp'
+  'ibWidth','session','bias','biasConflict','planned','beSwept','postSweep','emotion','notes','timestamp'
 ];
 
 function esc(v) {
@@ -1837,6 +1958,7 @@ function importCSV(event) {
         obj.r          = parseFloat(obj.r)||0;
         obj.tradeNo    = parseInt(obj.tradeNo)||1;
         obj.timestamp  = parseInt(obj.timestamp)||Date.now();
+        obj.biasConflict = obj.biasConflict === 'true' || obj.biasConflict === '1';
         obj.planned    = obj.planned === 'true' || obj.planned === '1';
         obj.beSwept    = obj.beSwept === 'true' || obj.beSwept === '1';
         if (!obj.id || seen.has(obj.id)) { skipped++; continue; }
@@ -2089,6 +2211,9 @@ function buildReviewMarkdown(dateStr, shots) {
   const emotions  = trades.map(t => t.emotion).filter(Boolean);
   const emotionVal = emotions.length ? (EMOTION_ZH[mode(emotions)] || mode(emotions)) : '';
 
+  const biasVals  = trades.map(t => t.bias).filter(Boolean);
+  const biasVal   = biasVals.length ? (BIAS_ZH[mode(biasVals)] || mode(biasVals)) : '';
+  const biasConflict = trades.some(t => t.biasConflict);
   const planned   = trades.filter(t => t.planned).length;
   const impulsive = trades.length - planned;
   const beSwept   = trades.filter(t => t.beSwept).length;
@@ -2119,9 +2244,10 @@ function buildReviewMarkdown(dateStr, shots) {
     const dir = t.direction === 'long' ? '多' : '空';
     const pl  = t.planned ? '是' : '否';
     const be  = t.beSwept ? '是' : '否';
-    return `| ${t.tradeNo} | ${dir} | ${t.entryTime||'—'} | ${t.entryPrice} | ${t.stopPrice} | ${t.exitPrice} | ${t.pnl >= 0?'+':''}${t.pnl.toFixed(2)} | ${t.r >= 0?'+':''}${t.r.toFixed(2)} | ${KEY_LVL_ZH[t.keyLevel]||t.keyLevel||'—'} | ${pl} | ${be} |`;
+    const bias = BIAS_ZH[t.bias] || t.bias || '—';
+    return `| ${t.tradeNo} | ${dir} | ${t.entryTime||'—'} | ${t.entryPrice} | ${t.stopPrice} | ${t.exitPrice} | ${t.pnl >= 0?'+':''}${t.pnl.toFixed(2)} | ${t.r >= 0?'+':''}${t.r.toFixed(2)} | ${KEY_LVL_ZH[t.keyLevel]||t.keyLevel||'—'} | ${bias} | ${pl} | ${be} |`;
   });
-  if (!tradeRows.length) tradeRows.push('|   |   |   |   |   |   |   |   |   |   |   |');
+  if (!tradeRows.length) tradeRows.push('|   |   |   |   |   |   |   |   |   |   |   |   |');
 
   const md = `---
 date: ${dateStr}
@@ -2133,8 +2259,9 @@ date: ${dateStr}
 - 隔夜消息/数据：
 - GEX 环境：${gexVal}
 - 开盘位置 vs 前日VA：
-- 小时偏见：
+- 小时偏见：${biasVal}
 - 偏见依据：
+- 偏见-IB 冲突：${biasConflict ? '是' : '否'}
 
 ### 今日关键位（最多4个）
 
@@ -2152,8 +2279,8 @@ ${klRows.join('\n')}
 
 ### 交易记录
 
-| # | 方向 | 入场时间 | 入场价 | 止损价 | 出场价 | 盈亏点 | R倍数 | 关键位类型 | 计划内 | 被扫BE |
-|---|---|---|---|---|---|---|---|---|---|---|
+| # | 方向 | 入场时间 | 入场价 | 止损价 | 出场价 | 盈亏点 | R倍数 | 关键位类型 | 偏见 | 计划内 | 被扫BE |
+|---|---|---|---|---|---|---|---|---|---|---|---|
 ${tradeRows.join('\n')}
 
 ---
