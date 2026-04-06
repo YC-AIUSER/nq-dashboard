@@ -680,6 +680,77 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
   color: var(--green);
 }
 
+/* ──────── Hypothesis ──────── */
+.hypo-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  margin-bottom: 8px;
+}
+.hypo-item .hi-id {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--yellow);
+  min-width: 32px;
+}
+.hypo-item .hi-desc {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+}
+.hypo-item .hi-meta {
+  font-size: 11px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.hypo-item .hi-actions { display: flex; gap: 6px; }
+.hypo-item .hi-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-3);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 3px 8px;
+  transition: all 0.15s;
+}
+.hypo-item .hi-btn:hover { border-color: var(--accent); color: var(--accent-h); }
+.hypo-item .hi-btn.danger:hover { border-color: rgba(217,92,92,0.5); color: var(--red); }
+
+.hypo-progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  margin-bottom: 8px;
+}
+.hypo-progress-bar .hp-id { font-family: var(--mono); font-weight: 700; color: var(--yellow); min-width: 32px; }
+.hypo-progress-bar .hp-track {
+  flex: 1; height: 8px; background: var(--input-bg); border-radius: 4px; overflow: hidden; position: relative;
+}
+.hypo-progress-bar .hp-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+.hypo-progress-bar .hp-label { font-size: 12px; color: var(--text-2); font-family: var(--mono); min-width: 80px; text-align: right; }
+
+.hypo-compare-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 1fr 1fr 1fr;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(58,56,53,0.4);
+  font-size: 12.5px;
+}
+.hypo-compare-row:last-child { border-bottom: none; }
+.hypo-compare-head { color: var(--text-3); font-weight: 600; text-transform: uppercase; font-size: 11px; }
+
 /* ══════════════════════════════════════════ VAULT / OBSIDIAN ═══ */
 .vault-bar {
   padding: 8px 14px 0;
@@ -929,6 +1000,14 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
       统计面板
     </button>
 
+    <div class="nav-section-label" style="margin-top:12px">验证</div>
+    <button class="nav-item" onclick="nav(this,'hypo')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+        <circle cx="8" cy="8" r="5.5"/><path d="M7 6.5a1.5 1.5 0 012.1 1.4c0 .7-.6 1-1.1 1.2"/><circle cx="8" cy="11.2" r="0.5" fill="currentColor"/>
+      </svg>
+      假设验证
+    </button>
+
     <div class="nav-section-label" style="margin-top:12px">数据</div>
     <button class="nav-item" onclick="nav(this,'review')">
       <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
@@ -1171,6 +1250,13 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
         </div>
       </div>
 
+      <!-- 假设验证（复盘时填写） -->
+      <div class="card" id="hypo-entry-card" style="border-color:rgba(201,151,62,0.3)">
+        <div class="card-title" style="color:var(--yellow)">假设验证 · 纸上标记（不影响实际交易）</div>
+        <div id="hypo-entry-fields"></div>
+        <p style="font-size:11px;color:var(--text-3);margin-top:10px">复盘时填写：此假设是否适用、如果按假设执行结果会怎样。不干扰实盘记录。</p>
+      </div>
+
       <!-- 备注 -->
       <div class="card">
         <div class="card-title">备注</div>
@@ -1215,6 +1301,49 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
       </div>
       <div class="group-grid" id="group-grid"></div>
       <div id="be-panel"></div>
+    </div>
+  </div>
+
+  <!-- ─── PAGE: 假设验证 ─── -->
+  <div class="page" id="page-hypo">
+    <div style="max-width:800px">
+
+      <!-- 活跃假设管理 -->
+      <div class="card">
+        <div class="card-title">活跃假设（最多 2 个）</div>
+        <div id="hypo-list"></div>
+        <div id="hypo-add-form" style="margin-top:14px">
+          <div class="form-grid g2-3">
+            <div class="field">
+              <label>假设编号</label>
+              <input type="text" id="hypo-new-id" placeholder="H1" style="font-family:var(--mono)">
+            </div>
+            <div class="field">
+              <label>假设描述</label>
+              <input type="text" id="hypo-new-desc" placeholder="例如：IB突破后回踩关键位可做反向">
+            </div>
+          </div>
+          <button class="btn-primary" style="margin-top:12px;max-width:200px" onclick="addHypothesis()">添加假设</button>
+        </div>
+      </div>
+
+      <!-- 假设验证进度 -->
+      <div class="card">
+        <div class="card-title">验证进度</div>
+        <div id="hypo-progress"></div>
+      </div>
+
+      <!-- 假设对照数据 -->
+      <div class="card">
+        <div class="card-title">对照数据 · 假设 vs 实际</div>
+        <div id="hypo-comparison"></div>
+      </div>
+
+      <!-- 历史假设 -->
+      <div class="card">
+        <div class="card-title">已归档假设</div>
+        <div id="hypo-archived"></div>
+      </div>
     </div>
   </div>
 
@@ -1406,6 +1535,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   renderTodayList();
+  renderHypoEntryFields();
   syncInit();
   initVault();
   initPasteHandler();
@@ -1421,6 +1551,7 @@ const PAGE_META = {
   entry:  { title: '录入交易',  sub: '记录今日交易' },
   today:  { title: '今日汇总',  sub: '当日表现概览' },
   stats:  { title: '统计面板',  sub: '历史数据分析' },
+  hypo:   { title: '假设验证',  sub: '管理和追踪待验证假设' },
   review: { title: '生成复盘',  sub: '导出 Obsidian 每日复盘文件' },
   export: { title: '导出数据',  sub: '数据备份与恢复' },
 };
@@ -1435,6 +1566,7 @@ function nav(btn, name) {
   document.getElementById('topbar-sub').textContent   = m.sub;
   if (name === 'today')  renderTodayStats();
   if (name === 'stats')  renderAllStats();
+  if (name === 'hypo')   renderHypoPage();
   if (name === 'review') initReviewPage();
 }
 
@@ -1529,6 +1661,7 @@ function submitTrade() {
     postSweep:  document.getElementById('f-post-sweep').value,
     emotion:    document.getElementById('f-emotion').value,
     notes:      document.getElementById('f-notes').value.trim(),
+    hypoData:   collectHypoData(),
     timestamp:  Date.now(),
   };
 
@@ -1566,6 +1699,7 @@ function clearForm() {
   document.getElementById('f-day-type').value  = '';
   document.getElementById('f-gex').value       = '';
   document.getElementById('f-bias').value      = '';
+  clearHypoFields();
   document.getElementById('f-trade-no').value  = load().filter(t => t.date === d).length + 1;
 }
 
@@ -1895,16 +2029,256 @@ function renderBE(trades) {
   document.getElementById('be-panel').innerHTML = html;
 }
 
+/* ═══════════════════════════════════════════ HYPOTHESIS ═══ */
+const HYPO_KEY = 'nq_hypotheses_v1';
+const HYPO_CHECKPOINT_1 = 30, HYPO_CHECKPOINT_2 = 100;
+
+const loadHypos = () => { try { return JSON.parse(localStorage.getItem(HYPO_KEY)||'[]'); } catch { return []; } };
+const saveHypos = h  => localStorage.setItem(HYPO_KEY, JSON.stringify(h));
+
+function addHypothesis() {
+  const id   = document.getElementById('hypo-new-id').value.trim();
+  const desc = document.getElementById('hypo-new-desc').value.trim();
+  if (!id || !desc) return toast('请填写假设编号和描述', 'err');
+
+  const hypos = loadHypos();
+  const active = hypos.filter(h => h.status === 'active');
+  if (active.length >= 2) return toast('最多同时验证 2 个假设', 'err');
+  if (hypos.some(h => h.id === id)) return toast('编号已存在', 'err');
+
+  hypos.push({ id, desc, status: 'active', createdAt: todayStr() });
+  saveHypos(hypos);
+  document.getElementById('hypo-new-id').value = '';
+  document.getElementById('hypo-new-desc').value = '';
+  toast('✓ 假设已添加');
+  renderHypoPage();
+  renderHypoEntryFields();
+}
+
+function archiveHypothesis(id) {
+  const hypos = loadHypos();
+  const h = hypos.find(x => x.id === id);
+  if (h) h.status = 'archived';
+  saveHypos(hypos);
+  renderHypoPage();
+  renderHypoEntryFields();
+}
+
+function deleteHypothesis(id) {
+  if (!confirm(`确认删除假设 ${id}？相关对照数据将保留在交易记录中。`)) return;
+  saveHypos(loadHypos().filter(h => h.id !== id));
+  renderHypoPage();
+  renderHypoEntryFields();
+}
+
+function reactivateHypothesis(id) {
+  const hypos = loadHypos();
+  if (hypos.filter(h => h.status === 'active').length >= 2) return toast('已有 2 个活跃假设', 'err');
+  const h = hypos.find(x => x.id === id);
+  if (h) h.status = 'active';
+  saveHypos(hypos);
+  renderHypoPage();
+  renderHypoEntryFields();
+}
+
+/* ── Render entry form fields for active hypotheses ── */
+function renderHypoEntryFields() {
+  const active = loadHypos().filter(h => h.status === 'active');
+  const wrap = document.getElementById('hypo-entry-fields');
+  const card = document.getElementById('hypo-entry-card');
+
+  if (!active.length) {
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = '';
+
+  wrap.innerHTML = active.map(h => `
+    <div style="margin-bottom:14px;padding:12px;background:var(--panel);border:1px solid var(--border);border-radius:var(--r-sm)">
+      <div style="font-size:12px;font-weight:600;color:var(--yellow);margin-bottom:8px">${h.id}: ${h.desc}</div>
+      <div class="form-grid g3">
+        <div class="field">
+          <label>此假设是否适用</label>
+          <div class="seg-ctrl" id="hypo-applicable-${h.id}">
+            <button class="seg-btn" data-val="yes" onclick="segHypo(this,'hypo-applicable-${h.id}','s-pos')">适用</button>
+            <button class="seg-btn" data-val="no"  onclick="segHypo(this,'hypo-applicable-${h.id}','s-neutral')">不适用</button>
+          </div>
+          <input type="hidden" id="f-hypo-applicable-${h.id}">
+        </div>
+        <div class="field">
+          <label>假设执行方向</label>
+          <div class="seg-ctrl" id="hypo-dir-${h.id}">
+            <button class="seg-btn" data-val="long"  onclick="segHypo(this,'hypo-dir-${h.id}','s-long')">做多</button>
+            <button class="seg-btn" data-val="short" onclick="segHypo(this,'hypo-dir-${h.id}','s-short')">做空</button>
+            <button class="seg-btn" data-val="skip"  onclick="segHypo(this,'hypo-dir-${h.id}','s-neutral')">不交易</button>
+          </div>
+          <input type="hidden" id="f-hypo-dir-${h.id}">
+        </div>
+        <div class="field">
+          <label>假设结果（点数）</label>
+          <input type="number" id="f-hypo-result-${h.id}" step="0.25" placeholder="假设盈亏">
+        </div>
+      </div>
+      <div class="field" style="margin-top:8px">
+        <label>假设备注</label>
+        <input type="text" id="f-hypo-note-${h.id}" placeholder="如果按假设执行...">
+      </div>
+    </div>
+  `).join('');
+}
+
+function segHypo(btn, gid, cls) {
+  document.getElementById(gid).querySelectorAll('.seg-btn').forEach(b => b.className = 'seg-btn');
+  btn.classList.add(cls);
+  const hidden = document.getElementById('f-' + gid.replace('hypo-','hypo-'));
+  // find the matching hidden input
+  const parts = gid.split('-');
+  const type = parts[1]; // applicable or dir
+  const hid = parts.slice(2).join('-');
+  const inputId = `f-hypo-${type}-${hid}`;
+  const input = document.getElementById(inputId);
+  if (input) input.value = btn.dataset.val;
+}
+
+/* ── Collect hypothesis data on submit ── */
+function collectHypoData() {
+  const active = loadHypos().filter(h => h.status === 'active');
+  const data = {};
+  active.forEach(h => {
+    const applicable = document.getElementById(`f-hypo-applicable-${h.id}`)?.value || '';
+    const dir        = document.getElementById(`f-hypo-dir-${h.id}`)?.value || '';
+    const result     = parseFloat(document.getElementById(`f-hypo-result-${h.id}`)?.value) || 0;
+    const note       = document.getElementById(`f-hypo-note-${h.id}`)?.value?.trim() || '';
+    if (applicable) {
+      data[h.id] = { applicable, dir, result, note };
+    }
+  });
+  return Object.keys(data).length ? data : null;
+}
+
+function clearHypoFields() {
+  const active = loadHypos().filter(h => h.status === 'active');
+  active.forEach(h => {
+    ['applicable','dir'].forEach(type => {
+      const gid = `hypo-${type}-${h.id}`;
+      const el = document.getElementById(gid);
+      if (el) el.querySelectorAll('.seg-btn').forEach(b => b.className = 'seg-btn');
+      const input = document.getElementById(`f-hypo-${type}-${h.id}`);
+      if (input) input.value = '';
+    });
+    const resEl = document.getElementById(`f-hypo-result-${h.id}`);
+    if (resEl) resEl.value = '';
+    const noteEl = document.getElementById(`f-hypo-note-${h.id}`);
+    if (noteEl) noteEl.value = '';
+  });
+}
+
+/* ── Render hypothesis management page ── */
+function renderHypoPage() {
+  const hypos  = loadHypos();
+  const active = hypos.filter(h => h.status === 'active');
+  const archived = hypos.filter(h => h.status === 'archived');
+  const trades = load();
+
+  // Active list
+  const listEl = document.getElementById('hypo-list');
+  if (!active.length) {
+    listEl.innerHTML = '<div class="empty-msg">暂无活跃假设 — 添加一个开始验证</div>';
+  } else {
+    listEl.innerHTML = active.map(h => `
+      <div class="hypo-item">
+        <span class="hi-id">${h.id}</span>
+        <span class="hi-desc">${h.desc}</span>
+        <span class="hi-meta">创建 ${h.createdAt}</span>
+        <span class="hi-actions">
+          <button class="hi-btn danger" onclick="archiveHypothesis('${h.id}')">归档</button>
+        </span>
+      </div>
+    `).join('');
+  }
+
+  // Toggle add form
+  document.getElementById('hypo-add-form').style.display = active.length >= 2 ? 'none' : '';
+
+  // Progress bars
+  const progEl = document.getElementById('hypo-progress');
+  if (!active.length) {
+    progEl.innerHTML = '<div class="empty-msg">无活跃假设</div>';
+  } else {
+    progEl.innerHTML = active.map(h => {
+      const tagged = trades.filter(t => t.hypoData && t.hypoData[h.id]?.applicable === 'yes').length;
+      const pct1 = Math.min(100, tagged / HYPO_CHECKPOINT_1 * 100);
+      const pct2 = Math.min(100, tagged / HYPO_CHECKPOINT_2 * 100);
+      const color = tagged >= HYPO_CHECKPOINT_2 ? 'var(--green)' : tagged >= HYPO_CHECKPOINT_1 ? 'var(--yellow)' : 'var(--accent)';
+      const milestone = tagged >= HYPO_CHECKPOINT_2 ? '可正式评估' : tagged >= HYPO_CHECKPOINT_1 ? '已达检查点 ①' : `距检查点 ① 还需 ${HYPO_CHECKPOINT_1 - tagged} 笔`;
+      return `
+        <div class="hypo-progress-bar">
+          <span class="hp-id">${h.id}</span>
+          <div class="hp-track">
+            <div class="hp-fill" style="width:${pct2}%;background:${color}"></div>
+          </div>
+          <span class="hp-label">${tagged} / ${HYPO_CHECKPOINT_2} 笔</span>
+          <span style="font-size:11px;color:${color};min-width:120px">${milestone}</span>
+        </div>`;
+    }).join('');
+  }
+
+  // Comparison: hypothesis vs actual
+  const compEl = document.getElementById('hypo-comparison');
+  const allHypoIds = [...new Set([...active, ...archived].map(h => h.id))];
+  if (!allHypoIds.length) {
+    compEl.innerHTML = '<div class="empty-msg">暂无假设数据</div>';
+  } else {
+    let html = `<div class="hypo-compare-row hypo-compare-head">
+      <div>假设</div><div>样本量</div><div>假设盈亏</div><div>实际盈亏</div><div>差异</div>
+    </div>`;
+    allHypoIds.forEach(hid => {
+      const tagged = trades.filter(t => t.hypoData && t.hypoData[hid]?.applicable === 'yes');
+      if (!tagged.length) return;
+      const hypoTotal  = tagged.reduce((s,t) => s + (t.hypoData[hid].result || 0), 0);
+      const actualTotal = tagged.reduce((s,t) => s + t.pnl, 0);
+      const diff = hypoTotal - actualTotal;
+      const diffCls = diff >= 0 ? 'c-green' : 'c-red';
+      html += `<div class="hypo-compare-row">
+        <div style="font-weight:700;color:var(--yellow)">${hid}</div>
+        <div>${tagged.length} 笔</div>
+        <div class="${hypoTotal >= 0 ? 'c-green' : 'c-red'} c-num">${fp(hypoTotal)}</div>
+        <div class="${actualTotal >= 0 ? 'c-green' : 'c-red'} c-num">${fp(actualTotal)}</div>
+        <div class="${diffCls} c-num">${fp(diff)}</div>
+      </div>`;
+    });
+    compEl.innerHTML = html;
+  }
+
+  // Archived
+  const archEl = document.getElementById('hypo-archived');
+  if (!archived.length) {
+    archEl.innerHTML = '<div class="empty-msg">暂无归档假设</div>';
+  } else {
+    archEl.innerHTML = archived.map(h => `
+      <div class="hypo-item">
+        <span class="hi-id" style="opacity:0.5">${h.id}</span>
+        <span class="hi-desc" style="color:var(--text-3)">${h.desc}</span>
+        <span class="hi-meta">创建 ${h.createdAt}</span>
+        <span class="hi-actions">
+          <button class="hi-btn" onclick="reactivateHypothesis('${h.id}')">重新激活</button>
+          <button class="hi-btn danger" onclick="deleteHypothesis('${h.id}')">删除</button>
+        </span>
+      </div>
+    `).join('');
+  }
+}
+
 /* ═══════════════════════════════════════════ CSV EXPORT ═══ */
 const CSV_COLS = [
   'id','date','tradeNo','direction','entryTime','entryPrice','stopPrice',
   'exitPrice','exitTime','pnl','r','keyLevel','entryType','dayType','gex',
-  'ibWidth','session','bias','biasConflict','planned','beSwept','postSweep','emotion','notes','timestamp'
+  'ibWidth','session','bias','biasConflict','planned','beSwept','postSweep','emotion','notes','hypoData','timestamp'
 ];
 
 function esc(v) {
   if (v == null) return '';
-  const s = String(v);
+  const s = typeof v === 'object' ? JSON.stringify(v) : String(v);
   return (s.includes(',') || s.includes('"') || s.includes('\n'))
     ? '"' + s.replace(/"/g,'""') + '"' : s;
 }
@@ -1961,6 +2335,7 @@ function importCSV(event) {
         obj.biasConflict = obj.biasConflict === 'true' || obj.biasConflict === '1';
         obj.planned    = obj.planned === 'true' || obj.planned === '1';
         obj.beSwept    = obj.beSwept === 'true' || obj.beSwept === '1';
+        try { obj.hypoData = obj.hypoData ? JSON.parse(obj.hypoData) : null; } catch { obj.hypoData = null; }
         if (!obj.id || seen.has(obj.id)) { skipped++; continue; }
         imported.push(obj); seen.add(obj.id); added++;
       }
@@ -2249,6 +2624,27 @@ function buildReviewMarkdown(dateStr, shots) {
   });
   if (!tradeRows.length) tradeRows.push('|   |   |   |   |   |   |   |   |   |   |   |   |');
 
+  // Build hypothesis section
+  let hypoSection = '（今日无假设标记）';
+  const _hypos = loadHypos();
+  const _allHIds = _hypos.map(h => h.id);
+  const _tagged = trades.filter(t => t.hypoData);
+  if (_tagged.length && _allHIds.length) {
+    let _out = '';
+    _allHIds.forEach(hid => {
+      const _h = _hypos.find(x => x.id === hid);
+      const _applicable = _tagged.filter(t => t.hypoData[hid] && t.hypoData[hid].applicable === 'yes');
+      if (!_applicable.length) return;
+      _out += '**' + hid + '**: ' + (_h ? _h.desc : '') + '\n';
+      _applicable.forEach(t => {
+        const _d = t.hypoData[hid];
+        _out += '- 交易 #' + t.tradeNo + '：假设方向 ' + (_d.dir || '—') + '，假设盈亏 ' + (_d.result >= 0 ? '+' : '') + (_d.result||0).toFixed(2) + '，实际盈亏 ' + (t.pnl >= 0 ? '+' : '') + t.pnl.toFixed(2) + (_d.note ? '（' + _d.note + '）' : '') + '\n';
+      });
+      _out += '\n';
+    });
+    if (_out) hypoSection = _out;
+  }
+
   const md = `---
 date: ${dateStr}
 ---
@@ -2308,6 +2704,10 @@ ${tradeRows.join('\n')}
 
 ### 一句话反思
 
+
+### 假设验证标记
+
+${hypoSection}
 
 ### 操纵模式记录
 
