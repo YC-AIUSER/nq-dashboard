@@ -1327,6 +1327,37 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
         </div>
       </div>
 
+      <!-- 独立观察记录 -->
+      <div class="card" id="hypo-observe-card" style="border-color:rgba(201,151,62,0.3)">
+        <div class="card-title" style="color:var(--yellow)">记录观察 · 无需绑定交易</div>
+        <div id="hypo-observe-fields"></div>
+        <div class="form-grid g3" style="margin-top:10px">
+          <div class="field">
+            <label>日期</label>
+            <input type="date" id="ho-date">
+          </div>
+          <div class="field">
+            <label>观察时间</label>
+            <input type="time" id="ho-time" step="60">
+          </div>
+          <div class="field">
+            <label>关联价格</label>
+            <input type="number" id="ho-price" step="0.25" placeholder="触发时 NQ 价格">
+          </div>
+        </div>
+        <div class="field" style="margin-top:10px">
+          <label>观察备注</label>
+          <input type="text" id="ho-note" placeholder="描述假设触发的场景、为什么没入场等">
+        </div>
+        <button class="btn-primary" style="margin-top:12px;max-width:200px" onclick="submitObservation()">提交观察</button>
+      </div>
+
+      <!-- 观察记录列表 -->
+      <div class="card">
+        <div class="card-title">观察记录</div>
+        <div id="hypo-obs-list"></div>
+      </div>
+
       <!-- 假设验证进度 -->
       <div class="card">
         <div class="card-title">验证进度</div>
@@ -2031,10 +2062,13 @@ function renderBE(trades) {
 
 /* ═══════════════════════════════════════════ HYPOTHESIS ═══ */
 const HYPO_KEY = 'nq_hypotheses_v1';
+const HYPO_OBS_KEY = 'nq_hypo_obs_v1';
 const HYPO_CHECKPOINT_1 = 30, HYPO_CHECKPOINT_2 = 100;
 
 const loadHypos = () => { try { return JSON.parse(localStorage.getItem(HYPO_KEY)||'[]'); } catch { return []; } };
 const saveHypos = h  => localStorage.setItem(HYPO_KEY, JSON.stringify(h));
+const loadObs   = () => { try { return JSON.parse(localStorage.getItem(HYPO_OBS_KEY)||'[]'); } catch { return []; } };
+const saveObs   = o  => localStorage.setItem(HYPO_OBS_KEY, JSON.stringify(o));
 
 function addHypothesis() {
   const id   = document.getElementById('hypo-new-id').value.trim();
@@ -2130,13 +2164,7 @@ function renderHypoEntryFields() {
 function segHypo(btn, gid, cls) {
   document.getElementById(gid).querySelectorAll('.seg-btn').forEach(b => b.className = 'seg-btn');
   btn.classList.add(cls);
-  const hidden = document.getElementById('f-' + gid.replace('hypo-','hypo-'));
-  // find the matching hidden input
-  const parts = gid.split('-');
-  const type = parts[1]; // applicable or dir
-  const hid = parts.slice(2).join('-');
-  const inputId = `f-hypo-${type}-${hid}`;
-  const input = document.getElementById(inputId);
+  const input = document.getElementById('f-' + gid);
   if (input) input.value = btn.dataset.val;
 }
 
@@ -2173,12 +2201,137 @@ function clearHypoFields() {
   });
 }
 
+/* ── Observation: standalone hypothesis record ── */
+function renderObserveFields() {
+  const active = loadHypos().filter(h => h.status === 'active');
+  const card = document.getElementById('hypo-observe-card');
+  const wrap = document.getElementById('hypo-observe-fields');
+  if (!active.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  document.getElementById('ho-date').value = document.getElementById('ho-date').value || todayStr();
+
+  wrap.innerHTML = active.map(h => `
+    <div style="margin-bottom:10px;padding:12px;background:var(--panel);border:1px solid var(--border);border-radius:var(--r-sm)">
+      <div style="font-size:12px;font-weight:600;color:var(--yellow);margin-bottom:8px">${h.id}: ${h.desc}</div>
+      <div class="form-grid g3">
+        <div class="field">
+          <label>是否适用</label>
+          <div class="seg-ctrl" id="ho-applicable-${h.id}">
+            <button class="seg-btn" data-val="yes" onclick="segHypo(this,'ho-applicable-${h.id}','s-pos')">适用</button>
+            <button class="seg-btn" data-val="no"  onclick="segHypo(this,'ho-applicable-${h.id}','s-neutral')">不适用</button>
+          </div>
+          <input type="hidden" id="f-ho-applicable-${h.id}">
+        </div>
+        <div class="field">
+          <label>假设方向</label>
+          <div class="seg-ctrl" id="ho-dir-${h.id}">
+            <button class="seg-btn" data-val="long"  onclick="segHypo(this,'ho-dir-${h.id}','s-long')">做多</button>
+            <button class="seg-btn" data-val="short" onclick="segHypo(this,'ho-dir-${h.id}','s-short')">做空</button>
+            <button class="seg-btn" data-val="skip"  onclick="segHypo(this,'ho-dir-${h.id}','s-neutral')">不交易</button>
+          </div>
+          <input type="hidden" id="f-ho-dir-${h.id}">
+        </div>
+        <div class="field">
+          <label>假设结果（点数）</label>
+          <input type="number" id="f-ho-result-${h.id}" step="0.25" placeholder="假设盈亏">
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function submitObservation() {
+  const active = loadHypos().filter(h => h.status === 'active');
+  const date = document.getElementById('ho-date').value || todayStr();
+  const time = document.getElementById('ho-time').value || '';
+  const price = parseFloat(document.getElementById('ho-price').value) || 0;
+  const note = document.getElementById('ho-note').value.trim();
+
+  const hypoData = {};
+  let hasData = false;
+  active.forEach(h => {
+    const applicable = document.getElementById('f-ho-applicable-' + h.id)?.value || '';
+    const dir = document.getElementById('f-ho-dir-' + h.id)?.value || '';
+    const result = parseFloat(document.getElementById('f-ho-result-' + h.id)?.value) || 0;
+    if (applicable) {
+      hypoData[h.id] = { applicable, dir, result };
+      hasData = true;
+    }
+  });
+
+  if (!hasData) return toast('请至少标记一个假设的适用性', 'err');
+
+  const obs = loadObs();
+  obs.push({
+    id: date + '_obs_' + Date.now(),
+    date, time, price, note, hypoData,
+    timestamp: Date.now()
+  });
+  saveObs(obs);
+
+  // Clear fields
+  document.getElementById('ho-time').value = '';
+  document.getElementById('ho-price').value = '';
+  document.getElementById('ho-note').value = '';
+  active.forEach(h => {
+    ['applicable','dir'].forEach(type => {
+      const gid = 'ho-' + type + '-' + h.id;
+      const el = document.getElementById(gid);
+      if (el) el.querySelectorAll('.seg-btn').forEach(b => b.className = 'seg-btn');
+      const input = document.getElementById('f-ho-' + type + '-' + h.id);
+      if (input) input.value = '';
+    });
+    const resEl = document.getElementById('f-ho-result-' + h.id);
+    if (resEl) resEl.value = '';
+  });
+
+  toast('✓ 观察记录已保存');
+  renderObsList();
+  renderHypoPage();
+}
+
+function deleteObservation(id) {
+  if (!confirm('确认删除此观察记录？')) return;
+  saveObs(loadObs().filter(o => o.id !== id));
+  renderObsList();
+  renderHypoPage();
+}
+
+function renderObsList() {
+  const obs = loadObs().sort((a,b) => b.timestamp - a.timestamp);
+  const el = document.getElementById('hypo-obs-list');
+  if (!obs.length) { el.innerHTML = '<div class="empty-msg">暂无观察记录</div>'; return; }
+
+  const hypos = loadHypos();
+  let html = '<table style="width:100%"><thead><tr><th>日期</th><th>时间</th><th>价格</th><th>假设标记</th><th>备注</th><th></th></tr></thead><tbody>';
+  obs.slice(0, 50).forEach(o => {
+    const tags = Object.entries(o.hypoData || {}).map(([hid, d]) => {
+      const color = d.applicable === 'yes' ? 'var(--yellow)' : 'var(--text-3)';
+      const dirZh = { long:'多', short:'空', skip:'跳过' }[d.dir] || '—';
+      return '<span style="color:' + color + '">' + hid + ':' + (d.applicable === 'yes' ? dirZh + ' ' + (d.result >= 0 ? '+' : '') + (d.result||0).toFixed(0) + 'pt' : '不适用') + '</span>';
+    }).join(' ');
+    html += '<tr>'
+      + '<td class="c-dim c-num">' + o.date + '</td>'
+      + '<td class="c-dim">' + (o.time || '—') + '</td>'
+      + '<td class="c-num">' + (o.price || '—') + '</td>'
+      + '<td>' + tags + '</td>'
+      + '<td class="c-dim" style="max-width:180px;overflow:hidden;text-overflow:ellipsis">' + (o.note || '—') + '</td>'
+      + '<td><button class="btn-del" onclick="deleteObservation(\'' + o.id + '\')">删除</button></td>'
+      + '</tr>';
+  });
+  el.innerHTML = html + '</tbody></table>';
+}
+
 /* ── Render hypothesis management page ── */
 function renderHypoPage() {
   const hypos  = loadHypos();
   const active = hypos.filter(h => h.status === 'active');
   const archived = hypos.filter(h => h.status === 'archived');
   const trades = load();
+  const obs = loadObs();
+
+  renderObserveFields();
+  renderObsList();
 
   // Active list
   const listEl = document.getElementById('hypo-list');
@@ -2206,7 +2359,9 @@ function renderHypoPage() {
     progEl.innerHTML = '<div class="empty-msg">无活跃假设</div>';
   } else {
     progEl.innerHTML = active.map(h => {
-      const tagged = trades.filter(t => t.hypoData && t.hypoData[h.id]?.applicable === 'yes').length;
+      const tradeTags = trades.filter(t => t.hypoData && t.hypoData[h.id]?.applicable === 'yes').length;
+      const obsTags = obs.filter(o => o.hypoData && o.hypoData[h.id]?.applicable === 'yes').length;
+      const tagged = tradeTags + obsTags;
       const pct1 = Math.min(100, tagged / HYPO_CHECKPOINT_1 * 100);
       const pct2 = Math.min(100, tagged / HYPO_CHECKPOINT_2 * 100);
       const color = tagged >= HYPO_CHECKPOINT_2 ? 'var(--green)' : tagged >= HYPO_CHECKPOINT_1 ? 'var(--yellow)' : 'var(--accent)';
@@ -2230,21 +2385,23 @@ function renderHypoPage() {
     compEl.innerHTML = '<div class="empty-msg">暂无假设数据</div>';
   } else {
     let html = `<div class="hypo-compare-row hypo-compare-head">
-      <div>假设</div><div>样本量</div><div>假设盈亏</div><div>实际盈亏</div><div>差异</div>
+      <div>假设</div><div>样本量</div><div>假设盈亏</div><div>实际盈亏</div><div>来源</div>
     </div>`;
     allHypoIds.forEach(hid => {
-      const tagged = trades.filter(t => t.hypoData && t.hypoData[hid]?.applicable === 'yes');
-      if (!tagged.length) return;
-      const hypoTotal  = tagged.reduce((s,t) => s + (t.hypoData[hid].result || 0), 0);
-      const actualTotal = tagged.reduce((s,t) => s + t.pnl, 0);
-      const diff = hypoTotal - actualTotal;
-      const diffCls = diff >= 0 ? 'c-green' : 'c-red';
+      const taggedTrades = trades.filter(t => t.hypoData && t.hypoData[hid]?.applicable === 'yes');
+      const taggedObs = obs.filter(o => o.hypoData && o.hypoData[hid]?.applicable === 'yes');
+      const total = taggedTrades.length + taggedObs.length;
+      if (!total) return;
+      const hypoFromTrades = taggedTrades.reduce((s,t) => s + (t.hypoData[hid].result || 0), 0);
+      const hypoFromObs = taggedObs.reduce((s,o) => s + (o.hypoData[hid].result || 0), 0);
+      const hypoTotal = hypoFromTrades + hypoFromObs;
+      const actualTotal = taggedTrades.reduce((s,t) => s + t.pnl, 0);
       html += `<div class="hypo-compare-row">
         <div style="font-weight:700;color:var(--yellow)">${hid}</div>
-        <div>${tagged.length} 笔</div>
+        <div>${total} 笔</div>
         <div class="${hypoTotal >= 0 ? 'c-green' : 'c-red'} c-num">${fp(hypoTotal)}</div>
         <div class="${actualTotal >= 0 ? 'c-green' : 'c-red'} c-num">${fp(actualTotal)}</div>
-        <div class="${diffCls} c-num">${fp(diff)}</div>
+        <div class="c-dim">${taggedTrades.length} 交易 / ${taggedObs.length} 观察</div>
       </div>`;
     });
     compEl.innerHTML = html;
