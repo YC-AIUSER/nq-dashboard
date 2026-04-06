@@ -1,0 +1,1513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NQ 交易复盘系统</title>
+<style>
+/* ═══════════════════════════════════════════════ RESET & ROOT ═══ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #1C1917;
+  --sidebar:   #141210;
+  --surface:   #242220;
+  --panel:     #2C2A28;
+  --input-bg:  #323030;
+  --border:    #3A3835;
+  --border-hi: #4A4744;
+  --accent:    #C96A3E;
+  --accent-h:  #D97A50;
+  --accent-s:  rgba(201,106,62,0.12);
+  --green:     #4DB87A;
+  --green-s:   rgba(77,184,122,0.12);
+  --red:       #D95C5C;
+  --red-s:     rgba(217,92,92,0.12);
+  --yellow:    #C9973E;
+  --yellow-s:  rgba(201,151,62,0.12);
+  --text:      #EDEAE4;
+  --text-2:    #A8A49E;
+  --text-3:    #6B6762;
+  --font:      -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --mono:      'Consolas', 'Courier New', monospace;
+  --r-sm:      6px;
+  --r-md:      10px;
+  --r-lg:      14px;
+  --sidebar-w: 220px;
+}
+
+html, body { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ═════════════════════════════════════════════════════ SIDEBAR ═══ */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar-logo {
+  padding: 22px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-logo .logo-mark {
+  width: 30px; height: 30px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; color: #fff;
+  margin-bottom: 10px;
+  letter-spacing: -0.5px;
+}
+.sidebar-logo .logo-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.2px;
+}
+.sidebar-logo .logo-sub {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 1px;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 12px 10px;
+  overflow-y: auto;
+}
+
+.nav-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  padding: 6px 10px 4px;
+  margin-top: 6px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+  user-select: none;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+}
+.nav-item:hover { background: var(--surface); color: var(--text); }
+.nav-item.active {
+  background: var(--accent-s);
+  color: var(--accent-h);
+  border: 1px solid rgba(201,106,62,0.2);
+}
+.nav-icon {
+  width: 16px; height: 16px;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+.nav-item.active .nav-icon { opacity: 1; }
+
+.sidebar-footer {
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+}
+.sidebar-date {
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.6;
+}
+.sidebar-date strong {
+  display: block;
+  color: var(--text-2);
+  font-size: 12px;
+  margin-bottom: 1px;
+}
+
+/* ══════════════════════════════════════════════ MAIN CONTENT ═══ */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100vh;
+}
+
+.topbar {
+  background: var(--sidebar);
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.topbar-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.topbar-sub {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.page {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px;
+}
+.page.active { display: block; }
+
+/* ════════════════════════════════════════════════════ CARDS ═══ */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  color: var(--text-3);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ════════════════════════════════════════════════════ FORM ═══ */
+.form-grid { display: grid; gap: 14px; }
+.g2  { grid-template-columns: 1fr 1fr; }
+.g3  { grid-template-columns: 1fr 1fr 1fr; }
+.g4  { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.g2-3 { grid-template-columns: 2fr 3fr; }
+.span2 { grid-column: span 2; }
+.span3 { grid-column: span 3; }
+.span4 { grid-column: span 4; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+.field > label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.field input,
+.field select,
+.field textarea {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13.5px;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+  -webkit-appearance: none;
+}
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(201,106,62,0.15);
+}
+.field input::placeholder { color: var(--text-3); }
+.field textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
+.field select option { background: var(--panel); }
+
+.field input[readonly] {
+  color: var(--text-3);
+  cursor: default;
+  background: var(--panel);
+}
+.field input[readonly].val-pos { color: var(--green); font-weight: 600; font-family: var(--mono); }
+.field input[readonly].val-neg { color: var(--red);   font-weight: 600; font-family: var(--mono); }
+
+/* ── Segmented controls ── */
+.seg-ctrl {
+  display: flex;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 3px;
+  gap: 2px;
+}
+.seg-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  color: var(--text-3);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 7px 6px;
+  text-align: center;
+  transition: all 0.15s;
+  line-height: 1;
+}
+.seg-btn:hover { color: var(--text); background: var(--input-bg); }
+/* active states */
+.seg-btn.s-long    { background: var(--green-s);  color: var(--green);  border: 1px solid rgba(77,184,122,0.3); }
+.seg-btn.s-short   { background: var(--red-s);    color: var(--red);    border: 1px solid rgba(217,92,92,0.3); }
+.seg-btn.s-trend   { background: var(--green-s);  color: var(--green);  border: 1px solid rgba(77,184,122,0.3); }
+.seg-btn.s-range   { background: var(--yellow-s); color: var(--yellow); border: 1px solid rgba(201,151,62,0.3); }
+.seg-btn.s-neutral { background: var(--accent-s); color: var(--accent-h); border: 1px solid rgba(201,106,62,0.25); }
+.seg-btn.s-pos     { background: var(--green-s);  color: var(--green);  border: 1px solid rgba(77,184,122,0.3); }
+.seg-btn.s-neg     { background: var(--red-s);    color: var(--red);    border: 1px solid rgba(217,92,92,0.3); }
+
+/* ── Toggle switch ── */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 8px 12px;
+  height: 38px;
+}
+.toggle-row label { font-size: 12px; font-weight: 500; color: var(--text-2); }
+.switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch-track {
+  position: absolute; inset: 0;
+  background: var(--border);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.switch-track::after {
+  content: '';
+  position: absolute;
+  width: 14px; height: 14px;
+  left: 3px; top: 3px;
+  background: var(--text-3);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+.switch input:checked + .switch-track { background: rgba(201,106,62,0.3); }
+.switch input:checked + .switch-track::after {
+  transform: translateX(16px);
+  background: var(--accent-h);
+}
+
+/* ── Submit button ── */
+.btn-primary {
+  background: var(--accent);
+  border: none;
+  border-radius: var(--r-sm);
+  color: #fff;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 11px 20px;
+  width: 100%;
+  transition: background 0.15s;
+  letter-spacing: 0.2px;
+}
+.btn-primary:hover { background: var(--accent-h); }
+.btn-primary:active { transform: translateY(1px); }
+
+/* ════════════════════════════════════════════════ TRADE LIST ═══ */
+.list-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  margin-top: 20px;
+}
+.list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.list-head-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.count-pill {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 11px;
+  color: var(--text-2);
+  padding: 1px 9px;
+  font-weight: 600;
+}
+
+table { width: 100%; border-collapse: collapse; }
+thead tr { background: var(--panel); }
+th {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  letter-spacing: 0.4px;
+  padding: 9px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+td {
+  padding: 10px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(58,56,53,0.5);
+  white-space: nowrap;
+}
+tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: rgba(255,255,255,0.02); }
+
+.c-green { color: var(--green); font-weight: 600; font-family: var(--mono); }
+.c-red   { color: var(--red);   font-weight: 600; font-family: var(--mono); }
+.c-dim   { color: var(--text-3); }
+.c-num   { font-family: var(--mono); font-size: 12.5px; }
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  letter-spacing: 0.3px;
+}
+.badge-long  { background: var(--green-s); color: var(--green); border: 1px solid rgba(77,184,122,0.25); }
+.badge-short { background: var(--red-s);   color: var(--red);   border: 1px solid rgba(217,92,92,0.25); }
+.badge-plan  { background: var(--accent-s); color: var(--accent-h); border: 1px solid rgba(201,106,62,0.2); font-size: 10px; }
+
+.btn-del {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 3px 8px;
+  transition: all 0.15s;
+}
+.btn-del:hover { border-color: rgba(217,92,92,0.4); color: var(--red); }
+
+/* ═══════════════════════════════════════════ STAT CARDS GRID ═══ */
+.stat-grid { display: grid; gap: 12px; margin-bottom: 16px; }
+.sg-4 { grid-template-columns: repeat(4, 1fr); }
+.sg-3 { grid-template-columns: repeat(3, 1fr); }
+.sg-2 { grid-template-columns: repeat(2, 1fr); }
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 16px 18px;
+}
+.stat-card .sc-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.stat-card .sc-val {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+  font-family: var(--mono);
+}
+.stat-card .sc-sub {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 5px;
+}
+.sc-green { color: var(--green) !important; }
+.sc-red   { color: var(--red)   !important; }
+.sc-yellow{ color: var(--yellow)!important; }
+.sc-accent{ color: var(--accent-h)!important; }
+
+/* ════════════════════════════════════════════ ZONE INDICATOR ═══ */
+.zone-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.zone-panel .card-title { margin-bottom: 14px; }
+
+.zone-badge {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: var(--r-sm);
+  margin-bottom: 16px;
+  border: 1px solid;
+}
+.zone-badge.in-zone {
+  background: var(--green-s);
+  border-color: rgba(77,184,122,0.3);
+}
+.zone-badge.off-target {
+  background: var(--red-s);
+  border-color: rgba(217,92,92,0.3);
+}
+.zone-badge .zb-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.in-zone .zb-dot   { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.off-target .zb-dot { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+.zone-badge .zb-main {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.in-zone .zb-main   { color: var(--green); }
+.off-target .zb-main { color: var(--red); }
+.zone-badge .zb-desc {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+
+.zone-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.zm {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 12px;
+  text-align: center;
+}
+.zm .zm-val { font-size: 20px; font-weight: 700; font-family: var(--mono); margin-bottom: 4px; }
+.zm .zm-lbl { font-size: 11px; color: var(--text-3); }
+.zm-ok { color: var(--green); }
+.zm-no { color: var(--red); }
+
+/* ══════════════════════════════════════════════ GROUP STATS ═══ */
+.group-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
+
+.group-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 16px 18px;
+}
+.group-card .card-title { margin-bottom: 12px; }
+
+.g-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(58,56,53,0.4);
+}
+.g-row:last-child { border-bottom: none; }
+.g-name { font-size: 12.5px; color: var(--text-2); }
+.g-bar-bg {
+  width: 80px;
+  background: var(--panel);
+  border-radius: 3px;
+  height: 5px;
+  overflow: hidden;
+}
+.g-bar-fill { height: 100%; border-radius: 3px; }
+.g-wr { font-size: 12.5px; font-weight: 700; font-family: var(--mono); min-width: 42px; text-align: right; }
+.g-n  { font-size: 11px; color: var(--text-3); min-width: 28px; text-align: right; }
+
+/* ══════════════════════════════════════════════ EXPORT PAGE ═══ */
+.export-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 20px;
+  margin-bottom: 14px;
+  max-width: 480px;
+}
+.export-card .card-title { margin-bottom: 14px; }
+
+.btn-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 11px 14px;
+  text-align: left;
+  margin-bottom: 8px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btn-action:hover { border-color: var(--accent); color: var(--accent-h); }
+.btn-action.danger { color: var(--text-3); }
+.btn-action.danger:hover { border-color: rgba(217,92,92,0.5); color: var(--red); }
+.btn-action-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+.btn-import-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: var(--panel);
+  border: 1px dashed var(--border-hi);
+  border-radius: var(--r-sm);
+  color: var(--text-3);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 11px 14px;
+  margin-bottom: 8px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btn-import-label:hover { border-color: var(--accent); color: var(--text); }
+#import-file { display: none; }
+.export-hint {
+  font-size: 11.5px;
+  color: var(--text-3);
+  line-height: 1.6;
+  margin-top: 4px;
+}
+
+/* ════════════════════════════════════════════════════ TOAST ═══ */
+.toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 18px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: all 0.22s;
+  pointer-events: none;
+  z-index: 999;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.t-ok  { border-color: rgba(77,184,122,0.4); color: var(--green); }
+.toast.t-err { border-color: rgba(217,92,92,0.4);  color: var(--red); }
+
+.empty-msg {
+  text-align: center;
+  color: var(--text-3);
+  font-size: 13px;
+  padding: 36px 20px;
+}
+
+/* ──────── Scrollbar ──────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-hi); }
+
+/* ──────── Divider ──────── */
+.divider { height: 1px; background: var(--border); margin: 4px 0 12px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════ SIDEBAR ══ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark">NQ</div>
+    <div class="logo-title">交易复盘系统</div>
+    <div class="logo-sub">NQ Futures Dashboard</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">工作区</div>
+    <button class="nav-item active" onclick="nav(this,'entry')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+        <rect x="2" y="3" width="12" height="10" rx="1.5"/>
+        <line x1="5" y1="6.5" x2="11" y2="6.5"/><line x1="5" y1="9" x2="9" y2="9"/>
+      </svg>
+      录入交易
+    </button>
+    <button class="nav-item" onclick="nav(this,'today')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+        <rect x="2" y="2" width="12" height="12" rx="1.5"/>
+        <line x1="5" y1="8" x2="11" y2="8"/><line x1="8" y1="5" x2="8" y2="11"/>
+      </svg>
+      今日汇总
+    </button>
+    <button class="nav-item" onclick="nav(this,'stats')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+        <polyline points="2,12 6,7 9,10 13,4"/>
+        <line x1="2" y1="14" x2="14" y2="14"/>
+      </svg>
+      统计面板
+    </button>
+
+    <div class="nav-section-label" style="margin-top:12px">数据</div>
+    <button class="nav-item" onclick="nav(this,'export')">
+      <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+        <path d="M8 2v8M5 7l3 3 3-3"/><path d="M3 12h10a1 1 0 011 1v0a1 1 0 01-1 1H3a1 1 0 01-1-1v0a1 1 0 011-1z"/>
+      </svg>
+      导出数据
+    </button>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="sidebar-date">
+      <strong id="sb-date">—</strong>
+      <span id="sb-weekday">—</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ════════════════════════════════════════════ MAIN ══ -->
+<main class="main">
+  <div class="topbar">
+    <div class="topbar-title" id="topbar-title">录入交易</div>
+    <div class="topbar-sub" id="topbar-sub">记录今日交易</div>
+  </div>
+
+  <!-- ─── PAGE: 录入交易 ─── -->
+  <div class="page active" id="page-entry">
+    <div style="max-width:800px">
+
+      <!-- 基本信息 -->
+      <div class="card">
+        <div class="card-title">基本信息</div>
+        <div class="form-grid g4">
+          <div class="field">
+            <label>日期</label>
+            <input type="date" id="f-date">
+          </div>
+          <div class="field">
+            <label>交易编号</label>
+            <input type="number" id="f-trade-no" min="1">
+          </div>
+          <div class="field span2">
+            <label>方向</label>
+            <div class="seg-ctrl" id="dir-group">
+              <button class="seg-btn" data-val="long"  onclick="seg(this,'dir-group','s-long')">▲ 做多</button>
+              <button class="seg-btn" data-val="short" onclick="seg(this,'dir-group','s-short')">▼ 做空</button>
+            </div>
+            <input type="hidden" id="f-direction">
+          </div>
+        </div>
+      </div>
+
+      <!-- 价格与时间 -->
+      <div class="card">
+        <div class="card-title">价格 &amp; 时间</div>
+        <div class="form-grid g4">
+          <div class="field">
+            <label>入场时间</label>
+            <input type="time" id="f-entry-time" step="60">
+          </div>
+          <div class="field">
+            <label>入场价</label>
+            <input type="number" id="f-entry-price" step="0.25" placeholder="0.00" oninput="calcPnl()">
+          </div>
+          <div class="field">
+            <label>止损价</label>
+            <input type="number" id="f-stop-price" step="0.25" placeholder="0.00" oninput="calcPnl()">
+          </div>
+          <div class="field">
+            <label>出场价</label>
+            <input type="number" id="f-exit-price" step="0.25" placeholder="0.00" oninput="calcPnl()">
+          </div>
+          <div class="field">
+            <label>出场时间</label>
+            <input type="time" id="f-exit-time" step="60">
+          </div>
+          <div class="field">
+            <label>风险点数</label>
+            <input type="text" id="f-risk" readonly placeholder="自动计算">
+          </div>
+          <div class="field">
+            <label>盈亏点数</label>
+            <input type="text" id="f-pnl" readonly placeholder="自动计算">
+          </div>
+          <div class="field">
+            <label>R 倍数</label>
+            <input type="text" id="f-r" readonly placeholder="自动计算">
+          </div>
+        </div>
+      </div>
+
+      <!-- 交易结构 -->
+      <div class="card">
+        <div class="card-title">交易结构</div>
+        <div class="form-grid g4">
+          <div class="field">
+            <label>关键位类型</label>
+            <select id="f-key-level">
+              <option value="">— 选择 —</option>
+              <option value="high_delta">高成交量 Delta</option>
+              <option value="vp_poc">VP 成交密集区</option>
+              <option value="vp_hvn">VP 高成交节点</option>
+              <option value="vp_val">VP 价值区下沿</option>
+              <option value="vp_vah">VP 价值区上沿</option>
+              <option value="overlap">重叠区域</option>
+              <option value="cost_zone">成本区</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>入场类型</label>
+            <select id="f-entry-type">
+              <option value="">— 选择 —</option>
+              <option value="absorption">吸筹</option>
+              <option value="exhaustion">竭尽</option>
+              <option value="trapped">套牢</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>时段</label>
+            <select id="f-session">
+              <option value="">— 选择 —</option>
+              <option value="open_30min">开盘 30 分钟</option>
+              <option value="10_to_11">10:00 — 11:00</option>
+              <option value="11_to_12">11:00 — 12:00</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>IB 宽度（点）</label>
+            <input type="number" id="f-ib-width" step="0.25" min="0" placeholder="0.00">
+          </div>
+        </div>
+      </div>
+
+      <!-- 市场环境 -->
+      <div class="card">
+        <div class="card-title">市场环境</div>
+        <div class="form-grid g3">
+          <div class="field">
+            <label>日类型</label>
+            <div class="seg-ctrl" id="daytype-group">
+              <button class="seg-btn" data-val="trend"   onclick="seg(this,'daytype-group','s-trend')">趋势日</button>
+              <button class="seg-btn" data-val="range"   onclick="seg(this,'daytype-group','s-range')">震荡日</button>
+              <button class="seg-btn" data-val="neutral" onclick="seg(this,'daytype-group','s-neutral')">中性日</button>
+            </div>
+            <input type="hidden" id="f-day-type">
+          </div>
+          <div class="field">
+            <label>GEX 环境</label>
+            <div class="seg-ctrl" id="gex-group">
+              <button class="seg-btn" data-val="positive" onclick="seg(this,'gex-group','s-pos')">正 GEX</button>
+              <button class="seg-btn" data-val="negative" onclick="seg(this,'gex-group','s-neg')">负 GEX</button>
+              <button class="seg-btn" data-val="neutral"  onclick="seg(this,'gex-group','s-neutral')">中性</button>
+            </div>
+            <input type="hidden" id="f-gex">
+          </div>
+          <div class="field">
+            <label>情绪状态</label>
+            <select id="f-emotion">
+              <option value="">— 选择 —</option>
+              <option value="calm">平静</option>
+              <option value="anxious">焦虑</option>
+              <option value="impulsive">冲动</option>
+              <option value="hesitant">犹豫</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 标记 -->
+      <div class="card">
+        <div class="card-title">标记</div>
+        <div class="form-grid g3">
+          <div class="field">
+            <label>计划内交易</label>
+            <div class="toggle-row">
+              <label for="f-planned" id="planned-lbl" style="cursor:pointer">否</label>
+              <label class="switch">
+                <input type="checkbox" id="f-planned">
+                <span class="switch-track"></span>
+              </label>
+            </div>
+          </div>
+          <div class="field">
+            <label>被扫 BE</label>
+            <div class="toggle-row">
+              <label for="f-be-swept" id="be-lbl" style="cursor:pointer">否</label>
+              <label class="switch">
+                <input type="checkbox" id="f-be-swept">
+                <span class="switch-track"></span>
+              </label>
+            </div>
+          </div>
+          <div class="field">
+            <label>被扫后方向</label>
+            <select id="f-post-sweep">
+              <option value="na">不适用</option>
+              <option value="continued">继续原方向</option>
+              <option value="reversed">反向</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 备注 -->
+      <div class="card">
+        <div class="card-title">备注</div>
+        <div class="field">
+          <textarea id="f-notes" placeholder="交易思路、执行细节、心态复盘..."></textarea>
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="submitTrade()">提交交易记录</button>
+
+    </div><!-- /max-width -->
+
+    <!-- 今日已录入 -->
+    <div style="max-width:1100px" id="today-list-outer">
+      <div class="list-wrap" style="margin-top:24px">
+        <div class="list-head">
+          <span class="list-head-title">今日已录入</span>
+          <span class="count-pill" id="today-count">0</span>
+        </div>
+        <div id="today-table-wrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── PAGE: 今日汇总 ─── -->
+  <div class="page" id="page-today">
+    <div style="max-width:900px">
+      <div class="stat-grid sg-4" id="today-cards-a"></div>
+      <div class="stat-grid sg-4" id="today-cards-b"></div>
+    </div>
+  </div>
+
+  <!-- ─── PAGE: 统计面板 ─── -->
+  <div class="page" id="page-stats">
+    <div style="max-width:1080px">
+      <div class="stat-grid sg-4" id="overall-cards"></div>
+      <div class="zone-panel" id="rolling-panel">
+        <div class="card-title">最近 30 笔 · 滚动窗口</div>
+        <div id="zone-badge-wrap"></div>
+        <div class="zone-metrics" id="zone-metrics-wrap"></div>
+      </div>
+      <div class="group-grid" id="group-grid"></div>
+      <div id="be-panel"></div>
+    </div>
+  </div>
+
+  <!-- ─── PAGE: 导出数据 ─── -->
+  <div class="page" id="page-export">
+    <div class="export-card">
+      <div class="card-title">导出</div>
+      <button class="btn-action" onclick="exportCSV('all')">
+        <span class="btn-action-icon">⬇</span>导出全部数据（CSV）
+      </button>
+      <button class="btn-action" onclick="exportCSV('today')">
+        <span class="btn-action-icon">⬇</span>导出今日数据（CSV）
+      </button>
+    </div>
+    <div class="export-card">
+      <div class="card-title">导入</div>
+      <label class="btn-import-label" for="import-file">
+        <span class="btn-action-icon">⬆</span>从 CSV 文件导入（追加，ID 去重）
+      </label>
+      <input type="file" id="import-file" accept=".csv" onchange="importCSV(event)">
+      <p class="export-hint">导入会将新记录追加到现有数据中，以交易 ID 字段去重。<br>如需完整替换，请先清空数据，再执行导入。</p>
+    </div>
+    <div class="export-card">
+      <div class="card-title">危险操作</div>
+      <button class="btn-action danger" onclick="clearAll()">
+        <span class="btn-action-icon">✕</span>清空所有交易数据
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════ DATA ═══ */
+const KEY = 'nq_trades_v1';
+
+const load = () => { try { return JSON.parse(localStorage.getItem(KEY)||'[]'); } catch { return []; } };
+const save = t  => localStorage.setItem(KEY, JSON.stringify(t));
+const todayStr  = () => new Date().toISOString().slice(0,10);
+const formDate  = () => document.getElementById('f-date').value || todayStr();
+
+/* ═══════════════════════════════════════════ INIT ═══ */
+const WEEKDAYS = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+const MONTHS   = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+window.addEventListener('DOMContentLoaded', () => {
+  const now = new Date();
+  document.getElementById('sb-date').textContent =
+    `${now.getFullYear()} 年 ${MONTHS[now.getMonth()]} ${now.getDate()} 日`;
+  document.getElementById('sb-weekday').textContent = WEEKDAYS[now.getDay()];
+
+  document.getElementById('f-date').value = todayStr();
+  resetTradeNo();
+
+  document.getElementById('f-date').addEventListener('change', resetTradeNo);
+  document.getElementById('f-planned').addEventListener('change', function() {
+    document.getElementById('planned-lbl').textContent = this.checked ? '是' : '否';
+  });
+  document.getElementById('f-be-swept').addEventListener('change', function() {
+    document.getElementById('be-lbl').textContent = this.checked ? '是' : '否';
+  });
+
+  renderTodayList();
+});
+
+function resetTradeNo() {
+  const d = formDate();
+  document.getElementById('f-trade-no').value = load().filter(t => t.date === d).length + 1;
+}
+
+/* ═══════════════════════════════════════════ NAVIGATION ═══ */
+const PAGE_META = {
+  entry:  { title: '录入交易',  sub: '记录今日交易' },
+  today:  { title: '今日汇总',  sub: '当日表现概览' },
+  stats:  { title: '统计面板',  sub: '历史数据分析' },
+  export: { title: '导出数据',  sub: '数据备份与恢复' },
+};
+
+function nav(btn, name) {
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  const m = PAGE_META[name];
+  document.getElementById('topbar-title').textContent = m.title;
+  document.getElementById('topbar-sub').textContent   = m.sub;
+  if (name === 'today')  renderTodayStats();
+  if (name === 'stats')  renderAllStats();
+}
+
+/* ═══════════════════════════════════════════ UI HELPERS ═══ */
+function seg(btn, gid, cls) {
+  document.getElementById(gid).querySelectorAll('.seg-btn').forEach(b => b.className = 'seg-btn');
+  btn.classList.add(cls);
+  const map = { 'dir-group':'f-direction', 'daytype-group':'f-day-type', 'gex-group':'f-gex' };
+  if (map[gid]) document.getElementById(map[gid]).value = btn.dataset.val;
+}
+
+function toast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' t-'+type : ' t-ok');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = 'toast', 2600);
+}
+
+/* ═══════════════════════════════════════════ CALC ═══ */
+function calcPnl() {
+  const dir   = document.getElementById('f-direction').value;
+  const entry = parseFloat(document.getElementById('f-entry-price').value);
+  const stop  = parseFloat(document.getElementById('f-stop-price').value);
+  const exit  = parseFloat(document.getElementById('f-exit-price').value);
+  const pEl   = document.getElementById('f-pnl');
+  const rEl   = document.getElementById('f-r');
+  const rkEl  = document.getElementById('f-risk');
+
+  pEl.className = rEl.className = rkEl.className = '';
+
+  if (!dir || isNaN(entry) || isNaN(stop) || isNaN(exit)) {
+    pEl.value = rEl.value = rkEl.value = ''; return;
+  }
+
+  const risk = Math.abs(entry - stop);
+  const pnl  = dir === 'long' ? exit - entry : entry - exit;
+  const r    = risk > 0 ? pnl / risk : 0;
+
+  rkEl.value = risk.toFixed(2);
+  pEl.value  = (pnl >= 0 ? '+' : '') + pnl.toFixed(2);
+  rEl.value  = (r   >= 0 ? '+' : '') + r.toFixed(2) + 'R';
+
+  const cls = pnl >= 0 ? 'val-pos' : 'val-neg';
+  pEl.className = rEl.className = cls;
+}
+
+function derivePnlR(t) {
+  const risk = Math.abs(t.entryPrice - t.stopPrice);
+  const pnl  = t.direction === 'long' ? t.exitPrice - t.entryPrice : t.entryPrice - t.exitPrice;
+  return { pnl, r: risk > 0 ? pnl / risk : 0, risk };
+}
+
+/* ═══════════════════════════════════════════ SUBMIT ═══ */
+function submitTrade() {
+  const direction  = document.getElementById('f-direction').value;
+  const entryPrice = parseFloat(document.getElementById('f-entry-price').value);
+  const stopPrice  = parseFloat(document.getElementById('f-stop-price').value);
+  const exitPrice  = parseFloat(document.getElementById('f-exit-price').value);
+  const date       = document.getElementById('f-date').value;
+
+  if (!direction)         return toast('请选择方向（做多 / 做空）', 'err');
+  if (isNaN(entryPrice))  return toast('请填写入场价', 'err');
+  if (isNaN(stopPrice))   return toast('请填写止损价', 'err');
+  if (isNaN(exitPrice))   return toast('请填写出场价', 'err');
+  if (!date)              return toast('请选择日期', 'err');
+
+  const { pnl, r } = derivePnlR({ direction, entryPrice, stopPrice, exitPrice });
+
+  const trade = {
+    id:         date + '_' + Date.now(),
+    date,
+    tradeNo:    parseInt(document.getElementById('f-trade-no').value) || 1,
+    direction,
+    entryTime:  document.getElementById('f-entry-time').value,
+    entryPrice,
+    stopPrice,
+    exitPrice,
+    exitTime:   document.getElementById('f-exit-time').value,
+    pnl:        +pnl.toFixed(2),
+    r:          +r.toFixed(3),
+    keyLevel:   document.getElementById('f-key-level').value,
+    entryType:  document.getElementById('f-entry-type').value,
+    dayType:    document.getElementById('f-day-type').value,
+    gex:        document.getElementById('f-gex').value,
+    ibWidth:    parseFloat(document.getElementById('f-ib-width').value) || 0,
+    session:    document.getElementById('f-session').value,
+    planned:    document.getElementById('f-planned').checked,
+    beSwept:    document.getElementById('f-be-swept').checked,
+    postSweep:  document.getElementById('f-post-sweep').value,
+    emotion:    document.getElementById('f-emotion').value,
+    notes:      document.getElementById('f-notes').value.trim(),
+    timestamp:  Date.now(),
+  };
+
+  const trades = load();
+  trades.push(trade);
+  save(trades);
+  toast('✓ 交易记录已保存');
+  clearForm();
+  renderTodayList();
+}
+
+function clearForm() {
+  const d = formDate();
+  ['f-entry-time','f-entry-price','f-stop-price','f-exit-price',
+   'f-exit-time','f-key-level','f-entry-type','f-session','f-ib-width',
+   'f-notes','f-emotion'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  ['f-pnl','f-r','f-risk'].forEach(id => {
+    const el = document.getElementById(id);
+    el.value = ''; el.className = '';
+  });
+  document.getElementById('f-planned').checked  = false;
+  document.getElementById('f-be-swept').checked = false;
+  document.getElementById('f-post-sweep').value = 'na';
+  document.getElementById('planned-lbl').textContent = '否';
+  document.getElementById('be-lbl').textContent      = '否';
+  ['dir-group','daytype-group','gex-group'].forEach(gid =>
+    document.getElementById(gid).querySelectorAll('.seg-btn').forEach(b => b.className = 'seg-btn')
+  );
+  document.getElementById('f-direction').value = '';
+  document.getElementById('f-day-type').value  = '';
+  document.getElementById('f-gex').value       = '';
+  document.getElementById('f-trade-no').value  = load().filter(t => t.date === d).length + 1;
+}
+
+function deleteTrade(id) {
+  if (!confirm('确认删除这笔交易？')) return;
+  save(load().filter(t => t.id !== id));
+  renderTodayList();
+  resetTradeNo();
+}
+
+/* ═══════════════════════════════════════════ RENDER: LIST ═══ */
+const KEY_LVL_ZH  = { high_delta:'高成交量Delta', vp_poc:'VP密集区', vp_hvn:'VP高节点', vp_val:'VP下沿', vp_vah:'VP上沿', overlap:'重叠区', cost_zone:'成本区' };
+const ENTRY_ZH    = { absorption:'吸筹', exhaustion:'竭尽', trapped:'套牢' };
+const DAYTYPE_ZH  = { trend:'趋势日', range:'震荡日', neutral:'中性日' };
+const GEX_ZH      = { positive:'正GEX', negative:'负GEX', neutral:'中性' };
+const SESSION_ZH  = { open_30min:'开盘30min', '10_to_11':'10-11点', '11_to_12':'11-12点' };
+const EMOTION_ZH  = { calm:'平静', anxious:'焦虑', impulsive:'冲动', hesitant:'犹豫' };
+const SWEEP_ZH    = { continued:'继续', reversed:'反向', na:'—' };
+
+function renderTodayList() {
+  const d  = formDate();
+  const dt = load().filter(t => t.date === d).sort((a,b) => a.tradeNo - b.tradeNo);
+  document.getElementById('today-count').textContent = dt.length;
+  const wrap = document.getElementById('today-table-wrap');
+  if (!dt.length) { wrap.innerHTML = '<div class="empty-msg">今日暂无记录</div>'; return; }
+
+  let h = `<table><thead><tr>
+    <th>#</th><th>方向</th><th>入场价</th><th>出场价</th><th>止损价</th>
+    <th>盈亏点</th><th>R值</th><th>关键位</th><th>入场类型</th>
+    <th>日类型</th><th>计划内</th><th>情绪</th><th>备注</th><th></th>
+  </tr></thead><tbody>`;
+
+  dt.forEach(t => {
+    const win = t.pnl >= 0;
+    const pc  = win ? 'c-green' : 'c-red';
+    const dir = t.direction === 'long'
+      ? '<span class="badge badge-long">做多</span>'
+      : '<span class="badge badge-short">做空</span>';
+    const plan = t.planned
+      ? '<span class="badge badge-plan">计划内</span>'
+      : '<span class="c-dim">—</span>';
+    h += `<tr>
+      <td class="c-dim c-num">${t.tradeNo}</td>
+      <td>${dir}</td>
+      <td class="c-num">${t.entryPrice}</td>
+      <td class="c-num">${t.exitPrice}</td>
+      <td class="c-num">${t.stopPrice}</td>
+      <td class="${pc} c-num">${t.pnl >= 0?'+':''}${t.pnl.toFixed(2)}</td>
+      <td class="${pc} c-num">${t.r >= 0?'+':''}${t.r.toFixed(2)}R</td>
+      <td class="c-dim">${KEY_LVL_ZH[t.keyLevel]||t.keyLevel||'—'}</td>
+      <td class="c-dim">${ENTRY_ZH[t.entryType]||t.entryType||'—'}</td>
+      <td class="c-dim">${DAYTYPE_ZH[t.dayType]||t.dayType||'—'}</td>
+      <td>${plan}</td>
+      <td class="c-dim">${EMOTION_ZH[t.emotion]||t.emotion||'—'}</td>
+      <td class="c-dim" style="max-width:140px;overflow:hidden;text-overflow:ellipsis">${t.notes||'—'}</td>
+      <td><button class="btn-del" onclick="deleteTrade('${t.id}')">删除</button></td>
+    </tr>`;
+  });
+  wrap.innerHTML = h + '</tbody></table>';
+}
+
+/* ═══════════════════════════════════════════ STATS CALC ═══ */
+function calcStats(trades) {
+  if (!trades.length) return null;
+  const wins   = trades.filter(t => t.pnl > 0);
+  const losses = trades.filter(t => t.pnl <= 0);
+  const totalPnl = trades.reduce((s,t) => s + t.pnl, 0);
+  const avgR     = trades.reduce((s,t) => s + t.r, 0) / trades.length;
+  const winR     = wins.length   ? wins.reduce((s,t)=>s+t.r,0)/wins.length : 0;
+  const lossR    = losses.length ? Math.abs(losses.reduce((s,t)=>s+t.r,0)/losses.length) : 0;
+  const pf       = lossR > 0 ? (winR * wins.length) / (lossR * losses.length) : Infinity;
+  return {
+    n: trades.length, wins: wins.length, losses: losses.length,
+    wr: wins.length / trades.length,
+    totalPnl, avgR, winR, lossR, pf,
+    bestR:  trades.reduce((m,t) => Math.max(m,t.r), -Infinity),
+    worstR: trades.reduce((m,t) => Math.min(m,t.r),  Infinity),
+  };
+}
+
+const fp  = v => (v >= 0 ? '+' : '') + v.toFixed(2);
+const fR  = v => (v >= 0 ? '+' : '') + v.toFixed(2) + 'R';
+const fPc = v => (v * 100).toFixed(1) + '%';
+const fPf = v => v === Infinity ? '∞' : v.toFixed(2);
+
+function mkCard(label, val, sub, cls) {
+  return `<div class="stat-card">
+    <div class="sc-label">${label}</div>
+    <div class="sc-val ${cls||''}">${val}</div>
+    ${sub ? `<div class="sc-sub">${sub}</div>` : ''}
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════ RENDER: TODAY ═══ */
+function renderTodayStats() {
+  const d  = todayStr();
+  const dt = load().filter(t => t.date === d);
+  const s  = calcStats(dt);
+
+  const ca = document.getElementById('today-cards-a');
+  const cb = document.getElementById('today-cards-b');
+
+  if (!s) {
+    ca.innerHTML = '<div class="empty-msg" style="grid-column:span 4">今日暂无交易记录</div>';
+    cb.innerHTML = '';
+    return;
+  }
+
+  ca.innerHTML =
+    mkCard('总交易笔数', s.n, `${s.wins} 盈 / ${s.losses} 亏`) +
+    mkCard('胜 率', fPc(s.wr), '今日', s.wr >= 0.6 ? 'sc-green' : s.wr >= 0.45 ? '' : 'sc-red') +
+    mkCard('总盈亏点数', fp(s.totalPnl), null, s.totalPnl >= 0 ? 'sc-green' : 'sc-red') +
+    mkCard('平均 R', fR(s.avgR), null, s.avgR >= 0 ? 'sc-green' : 'sc-red');
+
+  const planned   = dt.filter(t => t.planned).length;
+  const impulsive = dt.length - planned;
+  const beSwept   = dt.filter(t => t.beSwept).length;
+
+  cb.innerHTML =
+    mkCard('最佳 R', fR(s.bestR), '单笔', s.bestR > 0 ? 'sc-green' : 'sc-red') +
+    mkCard('最差 R', fR(s.worstR), '单笔', s.worstR >= 0 ? '' : 'sc-red') +
+    mkCard('计划内 / 冲动', `${planned} / ${impulsive}`, `共 ${s.n} 笔`) +
+    mkCard('被扫 BE', `${beSwept} 次`, `占比 ${s.n > 0 ? (beSwept/s.n*100).toFixed(0)+'%' : '—'}`);
+}
+
+/* ═══════════════════════════════════════════ RENDER: ALL STATS ═══ */
+function renderAllStats() {
+  const trades = load().sort((a,b) => a.timestamp - b.timestamp);
+  const s = calcStats(trades);
+
+  const oc = document.getElementById('overall-cards');
+  if (!s) {
+    oc.innerHTML = '<div class="empty-msg" style="grid-column:span 4">暂无交易数据</div>';
+    document.getElementById('rolling-panel').style.display = 'none';
+    document.getElementById('group-grid').innerHTML = '';
+    document.getElementById('be-panel').innerHTML = '';
+    return;
+  }
+  document.getElementById('rolling-panel').style.display = '';
+
+  oc.innerHTML =
+    mkCard('总交易笔数', s.n, `${s.wins} 盈 / ${s.losses} 亏`) +
+    mkCard('总体胜率',   fPc(s.wr), null, s.wr>=0.6?'sc-green':s.wr>=0.45?'':'sc-red') +
+    mkCard('总盈亏点数', fp(s.totalPnl), null, s.totalPnl>=0?'sc-green':'sc-red') +
+    mkCard('平均 R',     fR(s.avgR), '所有交易', s.avgR>=0?'sc-green':'sc-red') +
+    mkCard('盈亏比',     fPf(s.pf), 'Profit Factor', s.pf>=2?'sc-green':s.pf>=1?'':'sc-red') +
+    mkCard('最佳 R',     fR(s.bestR), '单笔', s.bestR>0?'sc-green':'sc-red') +
+    mkCard('最差 R',     fR(s.worstR), '单笔', s.worstR>=0?'':'sc-red') +
+    mkCard('交易天数',   [...new Set(trades.map(t=>t.date))].length + ' 天', null);
+
+  renderRolling(trades);
+  renderGroups(trades);
+  renderBE(trades);
+}
+
+/* ─── Rolling 30 ─── */
+function renderRolling(trades) {
+  const recent = trades.slice(-30);
+  const rs = calcStats(recent);
+  if (!rs) return;
+
+  const TARGET_WR = 0.60, TARGET_PF = 2.0;
+  const ok = rs.wr >= TARGET_WR && rs.pf >= TARGET_PF;
+  const cls  = ok ? 'in-zone' : 'off-target';
+  const lbl  = ok ? '✓  达标 — 在区间内' : '✗  未达标 — 需改进';
+  const desc = ok
+    ? `胜率 ${fPc(rs.wr)} ≥ 60%，盈亏比 ${fPf(rs.pf)} ≥ 2.0`
+    : `目标：胜率 60%（当前 ${fPc(rs.wr)}）  盈亏比 2.0（当前 ${fPf(rs.pf)}）`;
+
+  document.getElementById('zone-badge-wrap').innerHTML = `
+    <div class="zone-badge ${cls}">
+      <div class="zb-dot"></div>
+      <div>
+        <div class="zb-main">${lbl}</div>
+        <div class="zb-desc">${desc}</div>
+      </div>
+    </div>`;
+
+  const wc = rs.wr >= TARGET_WR ? 'zm-ok' : 'zm-no';
+  const pc = rs.pf >= TARGET_PF ? 'zm-ok' : 'zm-no';
+  const rc = rs.avgR >= 0       ? 'zm-ok' : 'zm-no';
+
+  document.getElementById('zone-metrics-wrap').innerHTML = `
+    <div class="zm"><div class="zm-val ${wc}">${fPc(rs.wr)}</div><div class="zm-lbl">胜率</div></div>
+    <div class="zm"><div class="zm-val ${pc}">${fPf(rs.pf)}</div><div class="zm-lbl">盈亏比</div></div>
+    <div class="zm"><div class="zm-val ${rc}">${fR(rs.avgR)}</div><div class="zm-lbl">平均 R</div></div>
+    <div class="zm"><div class="zm-val">${recent.length}</div><div class="zm-lbl">样本量</div></div>`;
+}
+
+/* ─── Group breakdowns ─── */
+function groupCard(title, trades, keyFn, labelMap) {
+  const buckets = {};
+  trades.forEach(t => {
+    const k = keyFn(t) || 'n/a';
+    (buckets[k] = buckets[k]||[]).push(t);
+  });
+
+  const rows = Object.entries(buckets)
+    .map(([k,ts]) => ({ k, ts, ws: calcStats(ts) }))
+    .sort((a,b) => b.ws.wr - a.ws.wr);
+
+  if (!rows.length) return `<div class="group-card"><div class="card-title">${title}</div><div class="empty-msg">暂无数据</div></div>`;
+
+  let inner = rows.map(({k,ts,ws}) => {
+    const lbl   = labelMap[k] || k;
+    const wrPct = (ws.wr * 100).toFixed(0);
+    const col   = ws.wr >= 0.6 ? 'var(--green)' : ws.wr >= 0.45 ? 'var(--yellow)' : 'var(--red)';
+    return `<div class="g-row">
+      <div class="g-name">${lbl}</div>
+      <div class="g-bar-bg"><div class="g-bar-fill" style="width:${wrPct}%;background:${col}"></div></div>
+      <div class="g-wr" style="color:${col}">${fPc(ws.wr)}</div>
+      <div class="g-n">${ts.length}笔</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="group-card"><div class="card-title">${title}</div>${inner}</div>`;
+}
+
+function renderGroups(trades) {
+  document.getElementById('group-grid').innerHTML =
+    groupCard('按日类型',   trades, t=>t.dayType,   DAYTYPE_ZH) +
+    groupCard('按 GEX 环境', trades, t=>t.gex,       GEX_ZH) +
+    groupCard('按关键位类型', trades, t=>t.keyLevel,  KEY_LVL_ZH) +
+    groupCard('按入场类型',  trades, t=>t.entryType,  ENTRY_ZH) +
+    groupCard('按时段',     trades, t=>t.session,    SESSION_ZH) +
+    groupCard('按情绪状态',  trades, t=>t.emotion,   EMOTION_ZH);
+}
+
+/* ─── BE Analysis ─── */
+function renderBE(trades) {
+  const swept    = trades.filter(t => t.beSwept);
+  const notSwept = trades.filter(t => !t.beSwept);
+  const ss = calcStats(swept);
+  const ns = calcStats(notSwept);
+
+  let html = `<div class="group-card" style="margin-top:0">
+    <div class="card-title">被扫 BE 分析</div>`;
+
+  if (!ss) { html += '<div class="empty-msg">暂无被扫 BE 记录</div></div>'; document.getElementById('be-panel').innerHTML = html; return; }
+
+  const cont = swept.filter(t=>t.postSweep==='continued').length;
+  const rev  = swept.filter(t=>t.postSweep==='reversed').length;
+
+  html += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+    <div class="zm"><div class="zm-val">${swept.length}</div><div class="zm-lbl">总被扫次数</div></div>
+    <div class="zm"><div class="zm-val">${cont}</div><div class="zm-lbl">继续原方向</div></div>
+    <div class="zm"><div class="zm-val">${rev}</div><div class="zm-lbl">反转方向</div></div>
+    <div class="zm">
+      <div class="zm-val ${ss.wr>=0.6?'zm-ok':'zm-no'}">${fPc(ss.wr)}</div>
+      <div class="zm-lbl">被扫时胜率</div>
+    </div>
+  </div>`;
+
+  if (ns) {
+    html += `<div style="margin-top:10px;font-size:12px;color:var(--text-3)">
+      未被扫胜率：<span style="color:${ns.wr>=0.6?'var(--green)':'var(--red)'};font-weight:600">${fPc(ns.wr)}</span>
+      &nbsp;·&nbsp; 共 ${ns.n} 笔
+    </div>`;
+  }
+
+  html += '</div>';
+  document.getElementById('be-panel').innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════ CSV EXPORT ═══ */
+const CSV_COLS = [
+  'id','date','tradeNo','direction','entryTime','entryPrice','stopPrice',
+  'exitPrice','exitTime','pnl','r','keyLevel','entryType','dayType','gex',
+  'ibWidth','session','planned','beSwept','postSweep','emotion','notes','timestamp'
+];
+
+function esc(v) {
+  if (v == null) return '';
+  const s = String(v);
+  return (s.includes(',') || s.includes('"') || s.includes('\n'))
+    ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+
+function toCSV(trades) {
+  return [CSV_COLS.join(','), ...trades.map(t => CSV_COLS.map(c => esc(t[c])).join(','))].join('\r\n');
+}
+
+function dl(content, name) {
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob(['\uFEFF'+content], {type:'text/csv;charset=utf-8'})),
+    download: name
+  });
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+function exportCSV(mode) {
+  const all = load();
+  const rows = mode === 'today' ? all.filter(t => t.date === todayStr()) : all;
+  if (!rows.length) return toast('没有数据可导出', 'err');
+  dl(toCSV(rows), mode === 'today' ? `nq_trades_${todayStr()}.csv` : `nq_trades_all_${todayStr()}.csv`);
+  toast('✓ 导出成功');
+}
+
+/* ═══════════════════════════════════════════ CSV IMPORT ═══ */
+function importCSV(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const text = e.target.result.replace(/^\uFEFF/,'');
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) return toast('CSV 文件为空', 'err');
+
+      const headers  = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,''));
+      const existing = load();
+      const seen     = new Set(existing.map(t => t.id));
+      let added = 0, skipped = 0;
+
+      const imported = [];
+      for (let i = 1; i < lines.length; i++) {
+        const vals = parseCSVLine(lines[i]);
+        const obj  = {};
+        headers.forEach((h,idx) => obj[h] = vals[idx]??'');
+        obj.entryPrice = parseFloat(obj.entryPrice)||0;
+        obj.stopPrice  = parseFloat(obj.stopPrice)||0;
+        obj.exitPrice  = parseFloat(obj.exitPrice)||0;
+        obj.ibWidth    = parseFloat(obj.ibWidth)||0;
+        obj.pnl        = parseFloat(obj.pnl)||0;
+        obj.r          = parseFloat(obj.r)||0;
+        obj.tradeNo    = parseInt(obj.tradeNo)||1;
+        obj.timestamp  = parseInt(obj.timestamp)||Date.now();
+        obj.planned    = obj.planned === 'true' || obj.planned === '1';
+        obj.beSwept    = obj.beSwept === 'true' || obj.beSwept === '1';
+        if (!obj.id || seen.has(obj.id)) { skipped++; continue; }
+        imported.push(obj); seen.add(obj.id); added++;
+      }
+
+      save([...existing, ...imported]);
+      renderTodayList();
+      toast(`✓ 导入 ${added} 笔，跳过 ${skipped} 笔`);
+    } catch(err) { toast('导入失败：' + err.message, 'err'); }
+  };
+  reader.readAsText(file, 'utf-8');
+  event.target.value = '';
+}
+
+function parseCSVLine(line) {
+  const res = []; let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { if (inQ && line[i+1]==='"') { cur+='"'; i++; } else inQ=!inQ; }
+    else if (c===',' && !inQ) { res.push(cur); cur=''; }
+    else cur += c;
+  }
+  res.push(cur); return res;
+}
+
+/* ═══════════════════════════════════════════ CLEAR ═══ */
+function clearAll() {
+  if (!confirm('确认清空所有交易数据？此操作不可恢复。')) return;
+  if (!confirm('再次确认：将永久删除所有数据？')) return;
+  localStorage.removeItem(KEY);
+  renderTodayList();
+  toast('已清空所有数据');
+}
+</script>
+</body>
+</html>
