@@ -1869,6 +1869,7 @@ function submitTrade() {
   toast('✓ 交易记录已保存');
   clearForm();
   renderTodayList();
+  autoWriteReview(trade.date);
 }
 
 function clearForm() {
@@ -3076,6 +3077,15 @@ async function writeToObsidian() {
   } catch(e) {
     toast('写入失败：' + e.message, 'err');
   }
+}
+
+async function autoWriteReview(dateStr) {
+  const vault = await getVault();
+  if (!vault) return; // Not connected — skip silently
+  try {
+    const md = buildReviewMarkdown(dateStr);
+    await writeFile(vault, `daily_reviews/${dateStr}.md`, md);
+  } catch {}
 }
 
 function downloadReview() {
