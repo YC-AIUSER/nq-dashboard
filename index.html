@@ -1537,7 +1537,7 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
 const KEY = 'nq_trades_v1';
 
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY)||'[]'); } catch { return []; } };
-const save = t  => { localStorage.setItem(KEY, JSON.stringify(t)); syncPush(t); };
+const save = t  => { localStorage.setItem(KEY, JSON.stringify(t)); syncPush(); };
 const todayStr  = () => new Date().toISOString().slice(0,10);
 const formDate  = () => document.getElementById('f-date').value || todayStr();
 
@@ -2066,9 +2066,9 @@ const HYPO_OBS_KEY = 'nq_hypo_obs_v1';
 const HYPO_CHECKPOINT_1 = 30, HYPO_CHECKPOINT_2 = 100;
 
 const loadHypos = () => { try { return JSON.parse(localStorage.getItem(HYPO_KEY)||'[]'); } catch { return []; } };
-const saveHypos = h  => localStorage.setItem(HYPO_KEY, JSON.stringify(h));
+const saveHypos = h  => { localStorage.setItem(HYPO_KEY, JSON.stringify(h)); syncPush(); };
 const loadObs   = () => { try { return JSON.parse(localStorage.getItem(HYPO_OBS_KEY)||'[]'); } catch { return []; } };
-const saveObs   = o  => localStorage.setItem(HYPO_OBS_KEY, JSON.stringify(o));
+const saveObs   = o  => { localStorage.setItem(HYPO_OBS_KEY, JSON.stringify(o)); syncPush(); };
 
 function addHypothesis() {
   const id   = document.getElementById('hypo-new-id').value.trim();
@@ -2947,9 +2947,17 @@ async function syncInit() {
     setSyncStatus('ok', `已同步 ${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}`);
     renderTodayList();
     resetTradeNo();
+    renderHypoEntryFields();
   } catch(e) {
     setSyncStatus('err', '同步失败');
   }
+}
+
+function mergeById(local, remote) {
+  const byId = {};
+  local.forEach(t  => byId[t.id] = t);
+  remote.forEach(t => { if (!byId[t.id]) byId[t.id] = t; });
+  return Object.values(byId).sort((a,b) => a.timestamp - b.timestamp);
 }
 
 async function syncPullNow(cfg) {
@@ -2958,19 +2966,42 @@ async function syncPullNow(cfg) {
   });
   if (!res.ok) throw new Error('fetch failed');
   const gist = await res.json();
-  const content = gist.files?.['nq_trades.json']?.content;
-  if (!content) return;
 
-  const remote = JSON.parse(content);
-  const local  = load();
-  const byId   = {};
-  local.forEach(t  => byId[t.id] = t);
-  remote.forEach(t => { if (!byId[t.id]) byId[t.id] = t; });
-  const merged = Object.values(byId).sort((a,b) => a.timestamp - b.timestamp);
-  localStorage.setItem(KEY, JSON.stringify(merged));
+  // Trades
+  const tradesContent = gist.files?.['nq_trades.json']?.content;
+  if (tradesContent) {
+    const merged = mergeById(load(), JSON.parse(tradesContent));
+    localStorage.setItem(KEY, JSON.stringify(merged));
+  }
+
+  // Hypotheses
+  const hypoContent = gist.files?.['nq_hypotheses.json']?.content;
+  if (hypoContent) {
+    const remote = JSON.parse(hypoContent);
+    const local = loadHypos();
+    const byId = {};
+    local.forEach(h => byId[h.id] = h);
+    remote.forEach(h => { if (!byId[h.id]) byId[h.id] = h; else if (h.status !== byId[h.id].status) byId[h.id] = h; });
+    saveHypos(Object.values(byId));
+  }
+
+  // Observations
+  const obsContent = gist.files?.['nq_hypo_obs.json']?.content;
+  if (obsContent) {
+    const merged = mergeById(loadObs(), JSON.parse(obsContent));
+    saveObs(merged);
+  }
 }
 
-async function syncPush(trades) {
+function buildSyncFiles() {
+  return {
+    'nq_trades.json':    { content: JSON.stringify(load()) },
+    'nq_hypotheses.json': { content: JSON.stringify(loadHypos()) },
+    'nq_hypo_obs.json':  { content: JSON.stringify(loadObs()) }
+  };
+}
+
+async function syncPush() {
   const cfg = syncCfg();
   if (!cfg) return;
   setSyncStatus('busy', '同步中…');
@@ -2982,7 +3013,7 @@ async function syncPush(trades) {
         'Content-Type': 'application/json',
         'Accept': 'application/vnd.github.v3+json'
       },
-      body: JSON.stringify({ files: { 'nq_trades.json': { content: JSON.stringify(trades) } } })
+      body: JSON.stringify({ files: buildSyncFiles() })
     });
     if (!res.ok) throw new Error('push failed');
     const t = new Date();
@@ -3045,7 +3076,7 @@ async function connectSync() {
         body: JSON.stringify({
           description: 'NQ Trading Dashboard — 交易数据同步',
           public: false,
-          files: { 'nq_trades.json': { content: JSON.stringify(existing) } }
+          files: buildSyncFiles()
         })
       });
       if (!cr.ok) throw new Error('创建 Gist 失败');
@@ -3070,6 +3101,7 @@ async function connectSync() {
     setSyncStatus('ok', `已同步 ${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}`);
     renderTodayList();
     resetTradeNo();
+    renderHypoEntryFields();
 
     setTimeout(closeSyncModal, 1200);
     toast('✓ 同步已启用');
