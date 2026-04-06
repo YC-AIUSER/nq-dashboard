@@ -652,6 +652,137 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
 /* ──────── Divider ──────── */
 .divider { height: 1px; background: var(--border); margin: 4px 0 12px; }
 
+/* ══════════════════════════════════════════ VAULT / OBSIDIAN ═══ */
+.vault-bar {
+  padding: 8px 14px 0;
+}
+.paste-zone {
+  background: var(--panel);
+  border: 1px dashed var(--border-hi);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 140px;
+  padding: 16px;
+  transition: border-color 0.15s, background 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+.paste-zone:hover, .paste-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-s);
+}
+.paste-zone.has-img { border-style: solid; border-color: var(--border); }
+.paste-zone .pz-icon { font-size: 22px; opacity: 0.4; }
+.paste-zone .pz-label {
+  font-size: 11.5px;
+  color: var(--text-3);
+  text-align: center;
+  line-height: 1.4;
+}
+.paste-zone .pz-sub {
+  font-size: 10px;
+  color: var(--text-3);
+  opacity: 0.6;
+}
+.paste-zone img {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 5px;
+  display: none;
+  object-fit: contain;
+}
+.paste-zone .pz-filename {
+  font-size: 10px;
+  color: var(--green);
+  font-family: var(--mono);
+  display: none;
+  word-break: break-all;
+  text-align: center;
+}
+.paste-zone .pz-clear {
+  position: absolute;
+  top: 6px; right: 6px;
+  background: rgba(0,0,0,0.5);
+  border: none;
+  border-radius: 50%;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 13px;
+  width: 22px; height: 22px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.paste-zone.has-img .pz-clear { display: flex; }
+.paste-zone.has-img img { display: block; }
+.paste-zone.has-img .pz-filename { display: block; }
+.paste-zone.has-img .pz-icon,
+.paste-zone.has-img .pz-label,
+.paste-zone.has-img .pz-sub { display: none; }
+
+.vault-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--yellow-s);
+  border: 1px solid rgba(201,151,62,0.3);
+  border-radius: var(--r-sm);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 12.5px;
+  color: var(--yellow);
+}
+.vault-banner button {
+  margin-left: auto;
+  background: var(--yellow);
+  border: none;
+  border-radius: 4px;
+  color: #1a1700;
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 5px 12px;
+  white-space: nowrap;
+}
+.vault-connected-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--green-s);
+  border: 1px solid rgba(77,184,122,0.25);
+  border-radius: var(--r-sm);
+  padding: 9px 14px;
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--green);
+}
+.vault-connected-bar .vcb-path {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-3);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vault-connected-bar button {
+  background: none;
+  border: 1px solid rgba(77,184,122,0.3);
+  border-radius: 4px;
+  color: var(--text-3);
+  cursor: pointer;
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
 /* ══════════════════════════════════════════════ SYNC ═══ */
 .sync-bar {
   padding: 10px 14px 14px;
@@ -790,6 +921,13 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
     <div class="sidebar-date" style="padding-bottom:12px">
       <strong id="sb-date">—</strong>
       <span id="sb-weekday">—</span>
+    </div>
+  </div>
+  <div class="vault-bar">
+    <div class="sync-row">
+      <div class="sync-dot sd-idle" id="vault-dot"></div>
+      <span class="sync-lbl" id="vault-lbl">未连接 Obsidian</span>
+      <button class="sync-btn" onclick="connectVault()">连接</button>
     </div>
   </div>
   <div class="sync-bar">
@@ -1034,13 +1172,17 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
 
   <!-- ─── PAGE: 生成复盘 ─── -->
   <div class="page" id="page-review">
-    <div style="max-width:640px">
+    <div style="max-width:700px">
 
+      <!-- Vault status banner -->
+      <div id="rv-vault-banner"></div>
+
+      <!-- Date -->
       <div class="card">
-        <div class="card-title">生成 Obsidian 每日复盘文件</div>
-        <div class="form-grid g2" style="margin-bottom:16px">
+        <div class="card-title">复盘日期</div>
+        <div class="form-grid g2">
           <div class="field">
-            <label>复盘日期</label>
+            <label>日期</label>
             <input type="date" id="rv-date">
           </div>
           <div class="field">
@@ -1048,18 +1190,62 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
             <input type="text" id="rv-filename" readonly style="font-family:var(--mono);font-size:12px">
           </div>
         </div>
+      </div>
 
-        <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--r-sm);padding:14px 16px;margin-bottom:16px">
-          <div style="font-size:11px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px">自动填入内容预览</div>
-          <div id="rv-preview" style="font-size:12px;color:var(--text-2);line-height:1.8;font-family:var(--mono);white-space:pre-wrap;max-height:220px;overflow-y:auto"></div>
+      <!-- Screenshots -->
+      <div class="card">
+        <div class="card-title">截图 — 直接粘贴 Ctrl+V 或拖入图片</div>
+        <div class="form-grid g2">
+          <div class="field">
+            <label>最佳交易截图</label>
+            <div class="paste-zone" id="pz-best"
+              ondragover="pzDragOver(event)"
+              ondragleave="pzDragLeave(event)"
+              ondrop="pzDrop(event,'best')"
+              onclick="pzClick('best')">
+              <button class="pz-clear" onclick="pzClear(event,'best')">✕</button>
+              <img id="pz-best-img" alt="">
+              <div class="pz-filename" id="pz-best-name"></div>
+              <div class="pz-icon">📈</div>
+              <div class="pz-label">粘贴或拖入截图<br><span style="color:var(--accent-h)">Ctrl+V</span></div>
+              <div class="pz-sub">最佳交易 · 盈利最多 / R最高</div>
+            </div>
+          </div>
+          <div class="field">
+            <label>最差交易截图</label>
+            <div class="paste-zone" id="pz-worst"
+              ondragover="pzDragOver(event)"
+              ondragleave="pzDragLeave(event)"
+              ondrop="pzDrop(event,'worst')"
+              onclick="pzClick('worst')">
+              <button class="pz-clear" onclick="pzClear(event,'worst')">✕</button>
+              <img id="pz-worst-img" alt="">
+              <div class="pz-filename" id="pz-worst-name"></div>
+              <div class="pz-icon">📉</div>
+              <div class="pz-label">粘贴或拖入截图<br><span style="color:var(--accent-h)">Ctrl+V</span></div>
+              <div class="pz-sub">最差交易 · 亏损最多 / 执行最差</div>
+            </div>
+          </div>
         </div>
-
-        <button class="btn-primary" onclick="downloadReview()">
-          ⬇ 下载复盘文件（.md）
-        </button>
-        <p style="font-size:11px;color:var(--text-3);margin-top:8px;line-height:1.5">
-          文件下载后拖入 Obsidian 的 <code style="background:var(--panel);padding:1px 5px;border-radius:3px">daily_reviews/</code> 文件夹。截图区和盘前分析留空，在 Obsidian 里补充。
+        <p id="rv-shot-status" style="font-size:11px;margin-top:10px;line-height:1.5;color:var(--text-3)">
+          截图将自动保存到 <code style="background:var(--panel);padding:1px 5px;border-radius:3px">screenshots/</code> 文件夹
         </p>
+      </div>
+
+      <!-- Preview -->
+      <div class="card">
+        <div class="card-title">内容预览（自动生成部分）</div>
+        <div id="rv-preview" style="font-size:11.5px;color:var(--text-2);line-height:1.8;font-family:var(--mono);white-space:pre-wrap;max-height:240px;overflow-y:auto;background:var(--panel);border-radius:var(--r-sm);padding:12px 14px"></div>
+      </div>
+
+      <!-- Action buttons -->
+      <div style="display:flex;gap:10px">
+        <button class="btn-primary" id="rv-write-btn" onclick="writeToObsidian()" style="flex:2">
+          ✍ 写入 Obsidian
+        </button>
+        <button class="btn-primary" onclick="downloadReview()" style="flex:1;background:var(--panel);border:1px solid var(--border);color:var(--text-2)">
+          ⬇ 下载 .md
+        </button>
       </div>
 
     </div>
@@ -1170,6 +1356,8 @@ window.addEventListener('DOMContentLoaded', () => {
 
   renderTodayList();
   syncInit();
+  initVault();
+  initPasteHandler();
 });
 
 function resetTradeNo() {
@@ -1675,10 +1863,185 @@ function parseCSVLine(line) {
   res.push(cur); return res;
 }
 
+/* ══════════════════════════════════════ VAULT (File System API) ═══ */
+
+// ── IndexedDB helpers ──
+function openDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('nq-vault-v1', 1);
+    r.onupgradeneeded = e => e.target.result.createObjectStore('h');
+    r.onsuccess = e => res(e.target.result);
+    r.onerror   = () => rej(r.error);
+  });
+}
+async function idbPut(key, val) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('h','readwrite');
+    tx.objectStore('h').put(val, key);
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+  });
+}
+async function idbGet(key) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('h','readonly');
+    const r  = tx.objectStore('h').get(key);
+    r.onsuccess = () => res(r.result);
+    r.onerror   = () => rej(r.error);
+  });
+}
+
+// ── Vault handle ──
+let _vaultHandle = null;
+
+async function getVault() {
+  if (_vaultHandle) return _vaultHandle;
+  const h = await idbGet('vault');
+  if (!h) return null;
+  try {
+    const perm = await h.queryPermission({ mode:'readwrite' });
+    if (perm === 'granted') { _vaultHandle = h; return h; }
+    const req = await h.requestPermission({ mode:'readwrite' });
+    if (req === 'granted') { _vaultHandle = h; return h; }
+  } catch {}
+  return null;
+}
+
+async function connectVault() {
+  if (!window.showDirectoryPicker) {
+    return alert('此功能需要在 HTTPS 页面（GitHub Pages 版本）使用\nhttps://yc-aiuser.github.io/nq-dashboard/');
+  }
+  try {
+    const h = await window.showDirectoryPicker({ mode:'readwrite', id:'nq-vault' });
+    await idbPut('vault', h);
+    _vaultHandle = h;
+    updateVaultStatus(h.name);
+    toast('✓ 已连接：' + h.name);
+  } catch(e) {
+    if (e.name !== 'AbortError') toast('连接失败：' + e.message, 'err');
+  }
+}
+
+function updateVaultStatus(name) {
+  const dot = document.getElementById('vault-dot');
+  const lbl = document.getElementById('vault-lbl');
+  if (name) {
+    dot.className = 'sync-dot sd-ok';
+    lbl.textContent = name;
+  } else {
+    dot.className = 'sync-dot sd-idle';
+    lbl.textContent = '未连接 Obsidian';
+  }
+}
+
+async function initVault() {
+  const h = await getVault();
+  updateVaultStatus(h ? h.name : null);
+}
+
+// ── Write file helpers ──
+async function writeFile(dirHandle, relPath, content) {
+  const parts = relPath.split('/');
+  let cur = dirHandle;
+  for (let i = 0; i < parts.length - 1; i++) {
+    cur = await cur.getDirectoryHandle(parts[i], { create:true });
+  }
+  const fh = await cur.getFileHandle(parts[parts.length-1], { create:true });
+  const w  = await fh.createWritable();
+  await w.write(content); await w.close();
+}
+
+/* ════════════════════════════════════════ SCREENSHOT HANDLING ═══ */
+
+// in-session screenshot state
+const rvShots = { best: null, worst: null };
+// { filename: string, blob: Blob, url: string }
+
+function genFilename() {
+  const n = new Date();
+  const ts = [n.getFullYear(),
+    String(n.getMonth()+1).padStart(2,'0'),
+    String(n.getDate()).padStart(2,'0'),
+    String(n.getHours()).padStart(2,'0'),
+    String(n.getMinutes()).padStart(2,'0'),
+    String(n.getSeconds()).padStart(2,'0')].join('');
+  const rand = Math.random().toString(36).slice(2,9);
+  return `image-${ts}-${rand}.png`;
+}
+
+async function applyShot(type, blob) {
+  const filename = genFilename();
+  const url = URL.createObjectURL(blob);
+
+  // Free old blob URL
+  if (rvShots[type]) URL.revokeObjectURL(rvShots[type].url);
+  rvShots[type] = { filename, blob, url };
+
+  // Show in UI
+  const zone = document.getElementById('pz-' + type);
+  zone.classList.add('has-img');
+  document.getElementById('pz-' + type + '-img').src = url;
+  document.getElementById('pz-' + type + '-name').textContent = filename;
+
+  // Save to vault immediately if connected
+  const vault = await getVault();
+  if (vault) {
+    try {
+      await writeFile(vault, 'screenshots/' + filename, blob);
+      document.getElementById('rv-shot-status').innerHTML =
+        `<span style="color:var(--green)">✓ 截图已保存到 screenshots/ 文件夹</span>`;
+    } catch(e) {
+      document.getElementById('rv-shot-status').innerHTML =
+        `<span style="color:var(--red)">截图保存失败：${e.message}</span>`;
+    }
+  }
+
+  renderReviewPreview();
+}
+
+// Paste handler — attached to whole review page
+function initPasteHandler() {
+  // Track which zone was last clicked
+  window._pzFocus = null;
+  document.getElementById('pz-best').addEventListener('click',  () => window._pzFocus = 'best');
+  document.getElementById('pz-worst').addEventListener('click', () => window._pzFocus = 'worst');
+
+  document.addEventListener('paste', async e => {
+    if (!document.getElementById('page-review').classList.contains('active')) return;
+    const items = [...(e.clipboardData?.items || [])];
+    const imgItem = items.find(i => i.type.startsWith('image/'));
+    if (!imgItem) return;
+    e.preventDefault();
+    const blob = imgItem.getAsFile();
+    const type = window._pzFocus || 'best';
+    await applyShot(type, blob);
+  });
+}
+
+function pzDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function pzDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+async function pzDrop(e, type) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  const file = [...e.dataTransfer.files].find(f => f.type.startsWith('image/'));
+  if (file) await applyShot(type, file);
+}
+function pzClick(type) { window._pzFocus = type; }
+function pzClear(e, type) {
+  e.stopPropagation();
+  if (rvShots[type]) { URL.revokeObjectURL(rvShots[type].url); rvShots[type] = null; }
+  const zone = document.getElementById('pz-' + type);
+  zone.classList.remove('has-img');
+  document.getElementById('pz-' + type + '-img').src = '';
+  document.getElementById('pz-' + type + '-name').textContent = '';
+  renderReviewPreview();
+}
+
 /* ═══════════════════════════════════════════ REVIEW GENERATOR ═══ */
 const WEEKDAY_ZH = ['周日','周一','周二','周三','周四','周五','周六'];
 
-function initReviewPage() {
+async function initReviewPage() {
   const d = todayStr();
   document.getElementById('rv-date').value = d;
   updateReviewFilename();
@@ -1687,6 +2050,22 @@ function initReviewPage() {
     updateReviewFilename();
     renderReviewPreview();
   });
+
+  // Vault banner
+  const vault = await getVault();
+  const banner = document.getElementById('rv-vault-banner');
+  if (vault) {
+    banner.innerHTML = `<div class="vault-connected-bar">
+      <span>✓ 已连接</span>
+      <span class="vcb-path">${vault.name}/</span>
+      <button onclick="connectVault()">更换</button>
+    </div>`;
+  } else {
+    banner.innerHTML = `<div class="vault-banner">
+      <span>⚠ 未连接 Obsidian 文件夹，截图无法自动保存</span>
+      <button onclick="connectVault().then(()=>initReviewPage())">连接 OneDrive 文件夹</button>
+    </div>`;
+  }
 }
 
 function updateReviewFilename() {
@@ -1694,7 +2073,8 @@ function updateReviewFilename() {
   document.getElementById('rv-filename').value = `${d}.md`;
 }
 
-function buildReviewMarkdown(dateStr) {
+function buildReviewMarkdown(dateStr, shots) {
+  shots = shots || rvShots;
   const trades = load().filter(t => t.date === dateStr).sort((a,b) => a.tradeNo - b.tradeNo);
   const d = new Date(dateStr + 'T12:00:00');
   const wday = WEEKDAY_ZH[d.getDay()];
@@ -1781,10 +2161,10 @@ ${tradeRows.join('\n')}
 ## 截图区
 
 ### 最佳交易
-![[screenshots/（文件名）]]
+![[screenshots/${shots?.best?.filename || '（文件名）'}]]
 
 ### 最差交易
-![[screenshots/（文件名）]]
+![[screenshots/${shots?.worst?.filename || '（文件名）'}]]
 
 ---
 
@@ -1821,6 +2201,30 @@ function renderReviewPreview() {
   // show first ~30 lines as preview
   const lines = md.split('\n').slice(0, 32);
   document.getElementById('rv-preview').textContent = lines.join('\n') + (md.split('\n').length > 32 ? '\n…' : '');
+}
+
+async function writeToObsidian() {
+  let vault = await getVault();
+  if (!vault) {
+    await connectVault();
+    vault = await getVault();
+    if (!vault) return;
+  }
+  const d = document.getElementById('rv-date').value || todayStr();
+  const md = buildReviewMarkdown(d);
+  try {
+    for (const type of ['best','worst']) {
+      if (rvShots[type]?.blob) {
+        try { await writeFile(vault, 'screenshots/' + rvShots[type].filename, rvShots[type].blob); } catch {}
+      }
+    }
+    await writeFile(vault, `daily_reviews/${d}.md`, md);
+    toast(`✓ 已写入 daily_reviews/${d}.md`);
+    document.getElementById('rv-shot-status').innerHTML =
+      `<span style="color:var(--green)">✓ 已写入 Obsidian，OneDrive 自动同步中</span>`;
+  } catch(e) {
+    toast('写入失败：' + e.message, 'err');
+  }
 }
 
 function downloadReview() {
