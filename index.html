@@ -2810,9 +2810,10 @@ async function applyShot(type, blob) {
   const vault = await getVault();
   if (vault) {
     try {
-      await writeFile(vault, 'screenshots/' + filename, blob);
+      const udir = getCurrentUser() ? getCurrentUser() + '/' : '';
+      await writeFile(vault, udir + 'screenshots/' + filename, blob);
       document.getElementById('rv-shot-status').innerHTML =
-        `<span style="color:var(--green)">✓ 截图已保存到 screenshots/ 文件夹</span>`;
+        `<span style="color:var(--green)">✓ 截图已保存到 ${udir}screenshots/ 文件夹</span>`;
     } catch(e) {
       document.getElementById('rv-shot-status').innerHTML =
         `<span style="color:var(--red)">截图保存失败：${e.message}</span>`;
@@ -3009,10 +3010,10 @@ ${tradeRows.join('\n')}
 ## 截图区
 
 ### 最佳交易
-![[screenshots/${shots?.best?.filename || '（文件名）'}]]
+![[${getCurrentUser() ? getCurrentUser() + '/' : ''}screenshots/${shots?.best?.filename || '（文件名）'}]]
 
 ### 最差交易
-![[screenshots/${shots?.worst?.filename || '（文件名）'}]]
+![[${getCurrentUser() ? getCurrentUser() + '/' : ''}screenshots/${shots?.worst?.filename || '（文件名）'}]]
 
 ---
 
@@ -3064,14 +3065,15 @@ async function writeToObsidian() {
   }
   const d = document.getElementById('rv-date').value || todayStr();
   const md = buildReviewMarkdown(d);
+  const udir = getCurrentUser() ? getCurrentUser() + '/' : '';
   try {
     for (const type of ['best','worst']) {
       if (rvShots[type]?.blob) {
-        try { await writeFile(vault, 'screenshots/' + rvShots[type].filename, rvShots[type].blob); } catch {}
+        try { await writeFile(vault, udir + 'screenshots/' + rvShots[type].filename, rvShots[type].blob); } catch {}
       }
     }
-    await writeFile(vault, `daily_reviews/${d}.md`, md);
-    toast(`✓ 已写入 daily_reviews/${d}.md`);
+    await writeFile(vault, udir + `daily_reviews/${d}.md`, md);
+    toast(`✓ 已写入 ${udir}daily_reviews/${d}.md`);
     document.getElementById('rv-shot-status').innerHTML =
       `<span style="color:var(--green)">✓ 已写入 Obsidian，OneDrive 自动同步中</span>`;
   } catch(e) {
@@ -3081,10 +3083,11 @@ async function writeToObsidian() {
 
 async function autoWriteReview(dateStr) {
   const vault = await getVault();
-  if (!vault) return; // Not connected — skip silently
+  if (!vault) return;
+  const udir = getCurrentUser() ? getCurrentUser() + '/' : '';
   try {
     const md = buildReviewMarkdown(dateStr);
-    await writeFile(vault, `daily_reviews/${dateStr}.md`, md);
+    await writeFile(vault, udir + `daily_reviews/${dateStr}.md`, md);
   } catch {}
 }
 
