@@ -1078,6 +1078,7 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
       <div class="sync-dot sd-idle" id="sync-dot"></div>
       <span class="sync-lbl" id="sync-lbl">未配置同步</span>
       <button class="sync-btn" onclick="openSyncModal()">设置</button>
+      <button class="sync-btn" onclick="forceSync()" style="margin-left:4px">强制同步</button>
     </div>
   </div>
 </aside>
@@ -3218,6 +3219,48 @@ async function syncPush() {
   } catch(e) {
     console.error('[sync] push error:', e);
     setSyncStatus('err', '同步失败：' + e.message);
+  }
+}
+
+async function forceSync() {
+  const cfg = syncCfg();
+  if (!cfg) return toast('请先配置同步', 'err');
+  setSyncStatus('busy', '强制同步中…');
+  try {
+    // Step 1: pull
+    await syncPullNow(cfg);
+    // Step 2: force push all data
+    const files = buildSyncFiles();
+    const body = JSON.stringify({ files });
+    console.log('[force-sync] payload size:', body.length, 'bytes');
+    console.log('[force-sync] files:', Object.entries(files).map(([k,v]) => k + '(' + v.content.length + ')'));
+    const res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `token ${cfg.token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github.v3+json'
+      },
+      body
+    });
+    const text = await res.text();
+    console.log('[force-sync] response status:', res.status);
+    if (!res.ok) {
+      console.error('[force-sync] error body:', text);
+      throw new Error('HTTP ' + res.status + ': ' + text.slice(0, 200));
+    }
+    const gist = JSON.parse(text);
+    console.log('[force-sync] result files:', Object.keys(gist.files));
+    const t = new Date();
+    setSyncStatus('ok', `已同步 ${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}`);
+    renderTodayList();
+    resetTradeNo();
+    renderHypoEntryFields();
+    toast('✓ 强制同步完成，Gist 文件：' + Object.keys(gist.files).join(', '));
+  } catch(e) {
+    console.error('[force-sync] failed:', e);
+    setSyncStatus('err', '同步失败');
+    toast('同步失败：' + e.message, 'err');
   }
 }
 
