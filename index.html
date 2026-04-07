@@ -1714,6 +1714,40 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // Repair: merge any orphaned unprefixed data into current user
+  if (getCurrentUser()) {
+    const REPAIR_KEYS = ['nq_trades_v1','nq_hypotheses_v1','nq_hypo_obs_v1','nq_sync_v1'];
+    let repaired = false;
+    REPAIR_KEYS.forEach(k => {
+      const orphan = localStorage.getItem(k);
+      if (!orphan) return;
+      const prefixed = getCurrentUser() + '_' + k;
+      const existing = localStorage.getItem(prefixed);
+      if (!existing || existing === '[]' || existing === 'null') {
+        // No prefixed data, just move orphan over
+        localStorage.setItem(prefixed, orphan);
+      } else {
+        // Merge: both exist, combine arrays by id
+        try {
+          const oldArr = JSON.parse(orphan);
+          const newArr = JSON.parse(existing);
+          if (Array.isArray(oldArr) && Array.isArray(newArr)) {
+            const byId = {};
+            newArr.forEach(item => { const id = item.id || JSON.stringify(item); byId[id] = item; });
+            oldArr.forEach(item => { const id = item.id || JSON.stringify(item); if (!byId[id]) byId[id] = item; });
+            localStorage.setItem(prefixed, JSON.stringify(Object.values(byId)));
+          }
+        } catch {}
+      }
+      localStorage.removeItem(k);
+      repaired = true;
+    });
+    if (repaired) {
+      console.log('[repair] merged orphaned unprefixed data into user:', getCurrentUser());
+      toast('已修复遗留数据');
+    }
+  }
+
   document.getElementById('f-date').value = todayStr();
   resetTradeNo();
 
@@ -3184,17 +3218,10 @@ async function syncPullNow(cfg) {
 }
 
 function buildSyncFiles() {
-  const trades = load();
-  const hypos = loadHypos();
-  const obs = loadObs();
-  console.log('[buildSyncFiles] key:', KEY(), 'trades:', trades.length,
-    '| key:', HYPO_KEY(), 'hypos:', hypos.length,
-    '| key:', HYPO_OBS_KEY(), 'obs:', obs.length);
-  console.log('[buildSyncFiles] raw localStorage hypo:', localStorage.getItem(HYPO_KEY()));
   return {
-    'nq_trades.json':    { content: JSON.stringify(trades) },
-    'nq_hypotheses.json': { content: JSON.stringify(hypos) },
-    'nq_hypo_obs.json':  { content: JSON.stringify(obs) }
+    'nq_trades.json':    { content: JSON.stringify(load()) },
+    'nq_hypotheses.json': { content: JSON.stringify(loadHypos()) },
+    'nq_hypo_obs.json':  { content: JSON.stringify(loadObs()) }
   };
 }
 
