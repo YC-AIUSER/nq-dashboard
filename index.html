@@ -3140,36 +3140,45 @@ function mergeById(local, remote) {
   return Object.values(byId).sort((a,b) => a.timestamp - b.timestamp);
 }
 
+let _syncing = false;
+
 async function syncPullNow(cfg) {
-  const res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
-    headers: { 'Authorization': `token ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }
-  });
-  if (!res.ok) throw new Error('fetch failed');
-  const gist = await res.json();
+  _syncing = true;
+  try {
+    console.log('[sync] pulling from gist:', cfg.gistId.slice(0,8));
+    const res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
+      headers: { 'Authorization': `token ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) throw new Error('fetch failed: ' + res.status);
+    const gist = await res.json();
+    console.log('[sync] gist files:', Object.keys(gist.files));
 
-  // Trades
-  const tradesContent = gist.files?.['nq_trades.json']?.content;
-  if (tradesContent) {
-    const merged = mergeById(load(), JSON.parse(tradesContent));
-    localStorage.setItem(KEY(), JSON.stringify(merged));
-  }
+    // Trades
+    const tradesContent = gist.files?.['nq_trades.json']?.content;
+    if (tradesContent) {
+      const merged = mergeById(load(), JSON.parse(tradesContent));
+      localStorage.setItem(KEY(), JSON.stringify(merged));
+    }
 
-  // Hypotheses
-  const hypoContent = gist.files?.['nq_hypotheses.json']?.content;
-  if (hypoContent) {
-    const remote = JSON.parse(hypoContent);
-    const local = loadHypos();
-    const byId = {};
-    local.forEach(h => byId[h.id] = h);
-    remote.forEach(h => { if (!byId[h.id]) byId[h.id] = h; else if (h.status !== byId[h.id].status) byId[h.id] = h; });
-    saveHypos(Object.values(byId));
-  }
+    // Hypotheses
+    const hypoContent = gist.files?.['nq_hypotheses.json']?.content;
+    if (hypoContent) {
+      const remote = JSON.parse(hypoContent);
+      const local = loadHypos();
+      const byId = {};
+      local.forEach(h => byId[h.id] = h);
+      remote.forEach(h => { if (!byId[h.id]) byId[h.id] = h; else if (h.status !== byId[h.id].status) byId[h.id] = h; });
+      localStorage.setItem(HYPO_KEY(), JSON.stringify(Object.values(byId)));
+    }
 
-  // Observations
-  const obsContent = gist.files?.['nq_hypo_obs.json']?.content;
-  if (obsContent) {
-    const merged = mergeById(loadObs(), JSON.parse(obsContent));
-    saveObs(merged);
+    // Observations
+    const obsContent = gist.files?.['nq_hypo_obs.json']?.content;
+    if (obsContent) {
+      const merged = mergeById(loadObs(), JSON.parse(obsContent));
+      localStorage.setItem(HYPO_OBS_KEY(), JSON.stringify(merged));
+    }
+  } finally {
+    _syncing = false;
   }
 }
 
@@ -3183,9 +3192,11 @@ function buildSyncFiles() {
 
 async function syncPush() {
   const cfg = syncCfg();
-  if (!cfg) return;
+  if (!cfg || _syncing) return;
   setSyncStatus('busy', '同步中…');
   try {
+    const files = buildSyncFiles();
+    console.log('[sync] pushing files:', Object.keys(files));
     const res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
       method: 'PATCH',
       headers: {
@@ -3193,13 +3204,20 @@ async function syncPush() {
         'Content-Type': 'application/json',
         'Accept': 'application/vnd.github.v3+json'
       },
-      body: JSON.stringify({ files: buildSyncFiles() })
+      body: JSON.stringify({ files })
     });
-    if (!res.ok) throw new Error('push failed');
+    if (!res.ok) {
+      const err = await res.text();
+      console.error('[sync] push failed:', res.status, err);
+      throw new Error('push failed: ' + res.status);
+    }
+    const gist = await res.json();
+    console.log('[sync] push ok, gist files:', Object.keys(gist.files));
     const t = new Date();
     setSyncStatus('ok', `已同步 ${t.getHours().toString().padStart(2,'0')}:${t.getMinutes().toString().padStart(2,'0')}`);
-  } catch {
-    setSyncStatus('err', '同步失败');
+  } catch(e) {
+    console.error('[sync] push error:', e);
+    setSyncStatus('err', '同步失败：' + e.message);
   }
 }
 
