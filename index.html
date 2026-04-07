@@ -3184,10 +3184,17 @@ async function syncPullNow(cfg) {
 }
 
 function buildSyncFiles() {
+  const trades = load();
+  const hypos = loadHypos();
+  const obs = loadObs();
+  console.log('[buildSyncFiles] key:', KEY(), 'trades:', trades.length,
+    '| key:', HYPO_KEY(), 'hypos:', hypos.length,
+    '| key:', HYPO_OBS_KEY(), 'obs:', obs.length);
+  console.log('[buildSyncFiles] raw localStorage hypo:', localStorage.getItem(HYPO_KEY()));
   return {
-    'nq_trades.json':    { content: JSON.stringify(load()) },
-    'nq_hypotheses.json': { content: JSON.stringify(loadHypos()) },
-    'nq_hypo_obs.json':  { content: JSON.stringify(loadObs()) }
+    'nq_trades.json':    { content: JSON.stringify(trades) },
+    'nq_hypotheses.json': { content: JSON.stringify(hypos) },
+    'nq_hypo_obs.json':  { content: JSON.stringify(obs) }
   };
 }
 
