@@ -1748,7 +1748,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Repair: merge any orphaned unprefixed data into current user
   if (getCurrentUser()) {
-    const REPAIR_KEYS = ['nq_trades_v1','nq_hypotheses_v1','nq_hypo_obs_v1','nq_sync_v1'];
+    const REPAIR_KEYS = ['nq_trades_v1','nq_hypotheses_v1','nq_hypo_obs_v1','nq_sync_v1','nq_vp_data_v1'];
     let repaired = false;
     REPAIR_KEYS.forEach(k => {
       const orphan = localStorage.getItem(k);
@@ -1759,16 +1759,18 @@ window.addEventListener('DOMContentLoaded', () => {
         // No prefixed data, just move orphan over
         localStorage.setItem(prefixed, orphan);
       } else {
-        // Merge: both exist, combine arrays by id
+        // Merge: both exist
         try {
-          const oldArr = JSON.parse(orphan);
-          const newArr = JSON.parse(existing);
-          if (Array.isArray(oldArr) && Array.isArray(newArr)) {
+          const oldData = JSON.parse(orphan);
+          const newData = JSON.parse(existing);
+          if (Array.isArray(oldData) && Array.isArray(newData)) {
+            // Array merge by id
             const byId = {};
-            newArr.forEach(item => { const id = item.id || JSON.stringify(item); byId[id] = item; });
-            oldArr.forEach(item => { const id = item.id || JSON.stringify(item); if (!byId[id]) byId[id] = item; });
+            newData.forEach(item => { const id = item.id || JSON.stringify(item); byId[id] = item; });
+            oldData.forEach(item => { const id = item.id || JSON.stringify(item); if (!byId[id]) byId[id] = item; });
             localStorage.setItem(prefixed, JSON.stringify(Object.values(byId)));
           }
+          // Object type (e.g. VP data): keep prefixed version, discard orphan
         } catch {}
       }
       localStorage.removeItem(k);
@@ -2334,6 +2336,7 @@ async function loadVpFromFile(file) {
   document.getElementById('vp-lbl').textContent = 'VP ' + data.days.length + '天 (' + data.days[0].date.slice(5) + '~' + data.days[data.days.length-1].date.slice(5) + ')';
   toast('VP data loaded: ' + data.days.length + ' days');
   updateVpEnv();
+  syncPush();
 }
 
 function updateVpEnv() {
@@ -3328,6 +3331,8 @@ async function syncInit() {
     renderTodayList();
     resetTradeNo();
     renderHypoEntryFields();
+    renderHypoPage();
+    updateVpEnv();
   } catch(e) {
     setSyncStatus('err', '同步失败');
   }
@@ -3377,17 +3382,30 @@ async function syncPullNow(cfg) {
       const merged = mergeById(loadObs(), JSON.parse(obsContent));
       localStorage.setItem(HYPO_OBS_KEY(), JSON.stringify(merged));
     }
+
+    // VP Data
+    const vpContent = gist.files?.['nq_vp_data.json']?.content;
+    if (vpContent) {
+      const vpData = JSON.parse(vpContent);
+      saveVpData(vpData);
+      _vpData = vpData;
+      document.getElementById('vp-dot').style.background = 'var(--green)';
+      document.getElementById('vp-lbl').textContent = 'VP ' + vpData.days.length + '天 (' + vpData.days[0].date.slice(5) + '~' + vpData.days[vpData.days.length-1].date.slice(5) + ')';
+    }
   } finally {
     _syncing = false;
   }
 }
 
 function buildSyncFiles() {
-  return {
+  const files = {
     'nq_trades.json':    { content: JSON.stringify(load()) },
     'nq_hypotheses.json': { content: JSON.stringify(loadHypos()) },
     'nq_hypo_obs.json':  { content: JSON.stringify(loadObs()) }
   };
+  const vp = loadVpData();
+  if (vp) files['nq_vp_data.json'] = { content: JSON.stringify(vp) };
+  return files;
 }
 
 async function syncPush() {
@@ -3455,6 +3473,8 @@ async function forceSync() {
     renderTodayList();
     resetTradeNo();
     renderHypoEntryFields();
+    renderHypoPage();
+    updateVpEnv();
     toast('✓ 强制同步完成，Gist 文件：' + Object.keys(gist.files).join(', '));
   } catch(e) {
     console.error('[force-sync] failed:', e);
@@ -3542,6 +3562,8 @@ async function connectSync() {
     renderTodayList();
     resetTradeNo();
     renderHypoEntryFields();
+    renderHypoPage();
+    updateVpEnv();
 
     setTimeout(closeSyncModal, 1200);
     toast('✓ 同步已启用');
