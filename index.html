@@ -1524,6 +1524,9 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
         <button class="btn-primary" id="rv-write-btn" onclick="writeToObsidian()" style="flex:2">
           ✍ 写入 Obsidian
         </button>
+        <button class="btn-primary" onclick="batchWriteAllReviews()" style="flex:2;background:var(--panel);border:1px solid var(--yellow);color:var(--yellow)">
+          ✍ 批量写入所有日期
+        </button>
         <button class="btn-primary" onclick="downloadReview()" style="flex:1;background:var(--panel);border:1px solid var(--border);color:var(--text-2)">
           ⬇ 下载 .md
         </button>
@@ -3361,6 +3364,30 @@ async function autoWriteReview(dateStr) {
     const newMd = buildReviewMarkdown(dateStr);
     await writeFile(vault, path, mergeReviewMarkdown(newMd, oldMd));
   } catch {}
+}
+
+async function batchWriteAllReviews() {
+  let vault = await getVault();
+  if (!vault) {
+    await connectVault();
+    vault = await getVault();
+    if (!vault) return;
+  }
+  const trades = load();
+  const dates = [...new Set(trades.map(t => t.date))].sort();
+  if (!dates.length) return toast('没有交易数据', 'err');
+  const udir = getCurrentUser() ? getCurrentUser() + '/' : '';
+  let wrote = 0, skipped = 0;
+  for (const d of dates) {
+    try {
+      const path = udir + `daily_reviews/${d}.md`;
+      const oldMd = await readFile(vault, path);
+      const newMd = buildReviewMarkdown(d);
+      await writeFile(vault, path, mergeReviewMarkdown(newMd, oldMd));
+      wrote++;
+    } catch(e) { skipped++; console.error('[batch]', d, e); }
+  }
+  toast(`✓ 批量写入完成：${wrote} 天写入，${skipped} 天跳过`);
 }
 
 function downloadReview() {
