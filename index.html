@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>NQ 交易复盘系统</title>
 <style>
 /* ═══════════════════════════════════════════════ RESET & ROOT ═══ */
@@ -1089,6 +1092,7 @@ tbody tr:hover td { background: rgba(255,255,255,0.02); }
       <span class="sync-lbl" id="sync-lbl">未配置同步</span>
       <button class="sync-btn" onclick="openSyncModal()">设置</button>
       <button class="sync-btn" onclick="forceSync()" style="margin-left:4px">强制同步</button>
+      <button class="sync-btn" onclick="recoverFromGistHistory()" style="margin-left:4px;color:var(--yellow)">恢复数据</button>
     </div>
   </div>
 </aside>
@@ -1838,6 +1842,15 @@ function nav(btn, name) {
   if (name === 'review') initReviewPage();
 }
 
+function refreshActivePage() {
+  const active = document.querySelector('.page.active');
+  if (!active) return;
+  const id = active.id.replace('page-', '');
+  if (id === 'today')  renderTodayStats();
+  if (id === 'stats')  renderAllStats();
+  if (id === 'hypo')   renderHypoPage();
+}
+
 /* ═══════════════════════════════════════════ UI HELPERS ═══ */
 function seg(btn, gid, cls) {
   document.getElementById(gid).querySelectorAll('.seg-btn').forEach(b => b.className = 'seg-btn');
@@ -1940,6 +1953,7 @@ function submitTrade() {
   toast('✓ 交易记录已保存');
   clearForm();
   renderTodayList();
+  refreshActivePage();
   autoWriteReview(trade.date);
 }
 
@@ -1978,6 +1992,7 @@ function deleteTrade(id) {
   save(load().filter(t => t.id !== id));
   renderTodayList();
   resetTradeNo();
+  refreshActivePage();
 }
 
 /* ═══════════════════════════════════════════ RENDER: LIST ═══ */
@@ -2004,8 +2019,8 @@ function renderTodayList() {
   </tr></thead><tbody>`;
 
   dt.forEach(t => {
-    const win = t.pnl >= 0;
-    const pc  = win ? 'c-green' : 'c-red';
+    const isBE = t.r >= 0 && t.r < BE_THRESHOLD;
+    const pc  = isBE ? 'c-dim' : t.r >= BE_THRESHOLD ? 'c-green' : 'c-red';
     const dir = t.direction === 'long'
       ? '<span class="badge badge-long">做多</span>'
       : '<span class="badge badge-short">做空</span>';
@@ -2033,17 +2048,20 @@ function renderTodayList() {
 }
 
 /* ═══════════════════════════════════════════ STATS CALC ═══ */
+const BE_THRESHOLD = 0.1; // R < 0.1 视为 BE（保本）
+
 function calcStats(trades) {
   if (!trades.length) return null;
-  const wins   = trades.filter(t => t.pnl > 0);
-  const losses = trades.filter(t => t.pnl <= 0);
+  const wins   = trades.filter(t => t.r >= BE_THRESHOLD);
+  const be     = trades.filter(t => t.r >= 0 && t.r < BE_THRESHOLD);
+  const losses = trades.filter(t => t.r < 0);
   const totalPnl = trades.reduce((s,t) => s + t.pnl, 0);
   const avgR     = trades.reduce((s,t) => s + t.r, 0) / trades.length;
   const winR     = wins.length   ? wins.reduce((s,t)=>s+t.r,0)/wins.length : 0;
   const lossR    = losses.length ? Math.abs(losses.reduce((s,t)=>s+t.r,0)/losses.length) : 0;
   const pf       = lossR > 0 ? (winR * wins.length) / (lossR * losses.length) : Infinity;
   return {
-    n: trades.length, wins: wins.length, losses: losses.length,
+    n: trades.length, wins: wins.length, be: be.length, losses: losses.length,
     wr: wins.length / trades.length,
     totalPnl, avgR, winR, lossR, pf,
     bestR:  trades.reduce((m,t) => Math.max(m,t.r), -Infinity),
@@ -2158,7 +2176,7 @@ function renderTodayStats() {
   }
 
   ca.innerHTML =
-    mkCard('总交易笔数', s.n, `${s.wins} 盈 / ${s.losses} 亏`) +
+    mkCard('总交易笔数', s.n, `${s.wins} 盈 / ${s.be} BE / ${s.losses} 亏`) +
     mkCard('胜 率', fPc(s.wr), '今日', s.wr >= 0.6 ? 'sc-green' : s.wr >= 0.45 ? '' : 'sc-red') +
     mkCard('总盈亏点数', fp(s.totalPnl), null, s.totalPnl >= 0 ? 'sc-green' : 'sc-red') +
     mkCard('平均 R', fR(s.avgR), null, s.avgR >= 0 ? 'sc-green' : 'sc-red');
@@ -2190,7 +2208,7 @@ function renderAllStats() {
   document.getElementById('rolling-panel').style.display = '';
 
   oc.innerHTML =
-    mkCard('总交易笔数', s.n, `${s.wins} 盈 / ${s.losses} 亏`) +
+    mkCard('总交易笔数', s.n, `${s.wins} 盈 / ${s.be} BE / ${s.losses} 亏`) +
     mkCard('总体胜率',   fPc(s.wr), null, s.wr>=0.6?'sc-green':s.wr>=0.45?'':'sc-red') +
     mkCard('总盈亏点数', fp(s.totalPnl), null, s.totalPnl>=0?'sc-green':'sc-red') +
     mkCard('平均 R',     fR(s.avgR), '所有交易', s.avgR>=0?'sc-green':'sc-red') +
@@ -2870,6 +2888,7 @@ function importCSV(event) {
 
       save([...existing, ...imported]);
       renderTodayList();
+      refreshActivePage();
       toast(`✓ 导入 ${added} 笔，跳过 ${skipped} 笔`);
     } catch(err) { toast('导入失败：' + err.message, 'err'); }
   };
@@ -3208,6 +3227,10 @@ ${klRows.join('\n')}
 |---|---|---|---|---|---|---|---|---|---|---|---|
 ${tradeRows.join('\n')}
 
+### 交易备注
+
+${trades.filter(t => t.notes).map(t => `- **#${t.tradeNo}**：${t.notes}`).join('\n') || '（无备注）'}
+
 ---
 
 ## 截图区
@@ -3333,6 +3356,7 @@ async function syncInit() {
     renderHypoEntryFields();
     renderHypoPage();
     updateVpEnv();
+    refreshActivePage();
   } catch(e) {
     setSyncStatus('err', '同步失败');
   }
@@ -3347,6 +3371,18 @@ function mergeById(local, remote) {
 
 let _syncing = false;
 
+async function fetchGistFileContent(fileObj, token) {
+  // content 可能为 null（GitHub API 对大文件会截断），用 raw_url 回退
+  if (fileObj.content != null) return fileObj.content;
+  if (!fileObj.raw_url) return null;
+  console.log('[sync] content is null, fetching via raw_url:', fileObj.filename);
+  const res = await fetch(fileObj.raw_url, {
+    headers: { 'Authorization': `token ${token}`, 'Accept': 'text/plain' }
+  });
+  if (!res.ok) { console.error('[sync] raw_url fetch failed:', res.status); return null; }
+  return await res.text();
+}
+
 async function syncPullNow(cfg) {
   _syncing = true;
   try {
@@ -3356,35 +3392,47 @@ async function syncPullNow(cfg) {
     });
     if (!res.ok) throw new Error('fetch failed: ' + res.status);
     const gist = await res.json();
-    console.log('[sync] gist files:', Object.keys(gist.files));
+    const fileNames = Object.keys(gist.files);
+    console.log('[sync] gist files:', fileNames);
+    // 诊断：检查每个文件的 content 是否为 null
+    fileNames.forEach(f => {
+      const fi = gist.files[f];
+      console.log(`[sync] file "${f}": size=${fi.size}, truncated=${fi.truncated}, content=${fi.content === null ? 'NULL' : fi.content?.length + ' chars'}`);
+    });
 
     // Trades
-    const tradesContent = gist.files?.['nq_trades.json']?.content;
+    const tradesContent = await fetchGistFileContent(gist.files?.['nq_trades.json'] || {}, cfg.token);
     if (tradesContent) {
       const merged = mergeById(load(), JSON.parse(tradesContent));
       localStorage.setItem(KEY(), JSON.stringify(merged));
+      console.log('[sync] trades merged:', merged.length);
     }
 
     // Hypotheses
-    const hypoContent = gist.files?.['nq_hypotheses.json']?.content;
+    const hypoContent = await fetchGistFileContent(gist.files?.['nq_hypotheses.json'] || {}, cfg.token);
+    console.log('[sync] hypo content:', hypoContent ? hypoContent.length + ' chars' : 'NONE');
     if (hypoContent) {
       const remote = JSON.parse(hypoContent);
       const local = loadHypos();
+      console.log('[sync] hypo remote:', remote.length, 'local:', local.length);
       const byId = {};
       local.forEach(h => byId[h.id] = h);
       remote.forEach(h => { if (!byId[h.id]) byId[h.id] = h; else if (h.status !== byId[h.id].status) byId[h.id] = h; });
-      localStorage.setItem(HYPO_KEY(), JSON.stringify(Object.values(byId)));
+      const merged = Object.values(byId);
+      console.log('[sync] hypo merged:', merged.length, 'key:', HYPO_KEY());
+      localStorage.setItem(HYPO_KEY(), JSON.stringify(merged));
     }
 
     // Observations
-    const obsContent = gist.files?.['nq_hypo_obs.json']?.content;
+    const obsContent = await fetchGistFileContent(gist.files?.['nq_hypo_obs.json'] || {}, cfg.token);
     if (obsContent) {
       const merged = mergeById(loadObs(), JSON.parse(obsContent));
       localStorage.setItem(HYPO_OBS_KEY(), JSON.stringify(merged));
+      console.log('[sync] obs merged:', merged.length);
     }
 
     // VP Data
-    const vpContent = gist.files?.['nq_vp_data.json']?.content;
+    const vpContent = await fetchGistFileContent(gist.files?.['nq_vp_data.json'] || {}, cfg.token);
     if (vpContent) {
       const vpData = JSON.parse(vpContent);
       saveVpData(vpData);
@@ -3446,8 +3494,17 @@ async function forceSync() {
   try {
     // Step 1: pull
     await syncPullNow(cfg);
-    // Step 2: force push all data
+    // Step 2: 安全检查 — 不用空数据覆盖远程
     const files = buildSyncFiles();
+    const localTotal = load().length + loadHypos().length + loadObs().length;
+    if (localTotal === 0) {
+      console.warn('[force-sync] ⚠ 本地数据为空，跳过推送以防覆盖远程数据');
+      toast('⚠ 同步拉取完成但本地无数据，已跳过推送（防止覆盖远程）', 'err');
+      setSyncStatus('err', '本地无数据');
+      renderTodayList(); resetTradeNo(); renderHypoEntryFields(); renderHypoPage(); updateVpEnv(); refreshActivePage();
+      return;
+    }
+    // Step 3: push
     const body = JSON.stringify({ files });
     console.log('[force-sync] payload size:', body.length, 'bytes');
     console.log('[force-sync] files:', Object.entries(files).map(([k,v]) => k + '(' + v.content.length + ')'));
@@ -3475,11 +3532,86 @@ async function forceSync() {
     renderHypoEntryFields();
     renderHypoPage();
     updateVpEnv();
-    toast('✓ 强制同步完成，Gist 文件：' + Object.keys(gist.files).join(', '));
+    refreshActivePage();
+    const diagTrades = load().length;
+    const diagHypos = loadHypos();
+    const diagObs = loadObs().length;
+    const diagActive = diagHypos.filter(h => h.status === 'active').length;
+    toast(`✓ 同步完成 | 交易${diagTrades}笔 | 假设${diagHypos.length}个(活跃${diagActive}) | 观察${diagObs}条`);
   } catch(e) {
     console.error('[force-sync] failed:', e);
     setSyncStatus('err', '同步失败');
     toast('同步失败：' + e.message, 'err');
+  }
+}
+
+/* ── Gist 历史恢复 ── */
+async function recoverFromGistHistory() {
+  const cfg = syncCfg();
+  if (!cfg) return toast('请先配置同步', 'err');
+  setSyncStatus('busy', '查找历史版本…');
+  try {
+    const res = await fetch(`https://api.github.com/gists/${cfg.gistId}`, {
+      headers: { 'Authorization': `token ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) throw new Error('fetch failed: ' + res.status);
+    const gist = await res.json();
+    const history = gist.history || [];
+    console.log('[recover] gist has', history.length, 'versions');
+
+    // 遍历历史版本找到有数据的版本
+    for (let i = 0; i < Math.min(history.length, 20); i++) {
+      const ver = history[i];
+      console.log('[recover] checking version', i, ver.version.slice(0,8), ver.committed_at);
+      const vRes = await fetch(`https://api.github.com/gists/${cfg.gistId}/${ver.version}`, {
+        headers: { 'Authorization': `token ${cfg.token}`, 'Accept': 'application/vnd.github.v3+json' }
+      });
+      if (!vRes.ok) continue;
+      const vGist = await vRes.json();
+
+      const trades = await fetchGistFileContent(vGist.files?.['nq_trades.json'] || {}, cfg.token);
+      const hypos = await fetchGistFileContent(vGist.files?.['nq_hypotheses.json'] || {}, cfg.token);
+      const obs = await fetchGistFileContent(vGist.files?.['nq_hypo_obs.json'] || {}, cfg.token);
+
+      const tCount = trades ? JSON.parse(trades).length : 0;
+      const hCount = hypos ? JSON.parse(hypos).length : 0;
+      const oCount = obs ? JSON.parse(obs).length : 0;
+      console.log(`[recover] v${i}: trades=${tCount} hypos=${hCount} obs=${oCount}`);
+
+      if (tCount > 0 || hCount > 0 || oCount > 0) {
+        // 找到有数据的版本，恢复
+        if (trades && tCount > 0) {
+          const merged = mergeById(load(), JSON.parse(trades));
+          localStorage.setItem(KEY(), JSON.stringify(merged));
+        }
+        if (hypos && hCount > 0) {
+          const remote = JSON.parse(hypos);
+          const local = loadHypos();
+          const byId = {};
+          local.forEach(h => byId[h.id] = h);
+          remote.forEach(h => { if (!byId[h.id]) byId[h.id] = h; else if (h.status !== byId[h.id].status) byId[h.id] = h; });
+          localStorage.setItem(HYPO_KEY(), JSON.stringify(Object.values(byId)));
+        }
+        if (obs && oCount > 0) {
+          const merged = mergeById(loadObs(), JSON.parse(obs));
+          localStorage.setItem(HYPO_OBS_KEY(), JSON.stringify(merged));
+        }
+
+        renderTodayList(); resetTradeNo(); renderHypoEntryFields(); renderHypoPage(); updateVpEnv(); refreshActivePage();
+        setSyncStatus('ok', '已恢复');
+        toast(`✓ 已从历史版本 (${ver.committed_at.slice(0,16)}) 恢复: 交易${tCount} 假设${hCount} 观察${oCount}`);
+
+        // 恢复后推送到 Gist
+        await syncPush();
+        return;
+      }
+    }
+    toast('⚠ 未找到有数据的历史版本', 'err');
+    setSyncStatus('err', '无历史数据');
+  } catch(e) {
+    console.error('[recover] failed:', e);
+    toast('恢复失败：' + e.message, 'err');
+    setSyncStatus('err', '恢复失败');
   }
 }
 
@@ -3564,6 +3696,7 @@ async function connectSync() {
     renderHypoEntryFields();
     renderHypoPage();
     updateVpEnv();
+    refreshActivePage();
 
     setTimeout(closeSyncModal, 1200);
     toast('✓ 同步已启用');
@@ -3598,6 +3731,7 @@ function clearAll() {
   if (!confirm('再次确认：将永久删除所有数据？')) return;
   localStorage.removeItem(KEY());
   renderTodayList();
+  refreshActivePage();
   toast('已清空所有数据');
 }
 </script>
