@@ -3292,14 +3292,16 @@ async function writeToObsidian() {
   const d = document.getElementById('rv-date').value || todayStr();
   const md = buildReviewMarkdown(d);
   const udir = getCurrentUser() ? getCurrentUser() + '/' : '';
+  const path = udir + `daily_reviews/${d}.md`;
   try {
     for (const type of ['best','worst']) {
       if (rvShots[type]?.blob) {
         try { await writeFile(vault, udir + 'screenshots/' + rvShots[type].filename, rvShots[type].blob); } catch {}
       }
     }
-    await writeFile(vault, udir + `daily_reviews/${d}.md`, md);
-    toast(`✓ 已写入 ${udir}daily_reviews/${d}.md`);
+    const oldMd = await readFile(vault, path);
+    await writeFile(vault, path, mergeReviewMarkdown(md, oldMd));
+    toast(`✓ 已写入 ${path}`);
     document.getElementById('rv-shot-status').innerHTML =
       `<span style="color:var(--green)">✓ 已写入 Obsidian，OneDrive 自动同步中</span>`;
   } catch(e) {
@@ -3307,13 +3309,57 @@ async function writeToObsidian() {
   }
 }
 
+async function readFile(dirHandle, relPath) {
+  try {
+    const parts = relPath.split('/');
+    let cur = dirHandle;
+    for (let i = 0; i < parts.length - 1; i++) {
+      cur = await cur.getDirectoryHandle(parts[i]);
+    }
+    const fh = await cur.getFileHandle(parts[parts.length - 1]);
+    const file = await fh.getFile();
+    return await file.text();
+  } catch { return null; }
+}
+
+function mergeReviewMarkdown(newMd, oldMd) {
+  if (!oldMd) return newMd;
+  // 从旧文件提取截图区（## 截图区 到下一个 ---）
+  const shotRe = /## 截图区[\s\S]*?(?=\n---)/;
+  const oldShot = oldMd.match(shotRe);
+  if (oldShot && !oldShot[0].includes('（文件名）')) {
+    // 旧文件有真实截图引用，保留它
+    newMd = newMd.replace(shotRe, oldShot[0]);
+  }
+  // 从旧文件提取手动编辑的内容（一句话反思）
+  const reflectRe = /### 一句话反思\n+([\s\S]*?)(?=\n###)/;
+  const oldReflect = oldMd.match(reflectRe);
+  if (oldReflect && oldReflect[1].trim()) {
+    newMd = newMd.replace(/### 一句话反思\n+/, '### 一句话反思\n\n' + oldReflect[1].trim() + '\n\n');
+  }
+  // 从旧文件提取盘前准备的手动填写部分
+  const prepRe = /## 盘前准备\n+([\s\S]*?)(?=\n###|\n---)/;
+  const oldPrep = oldMd.match(prepRe);
+  const newPrep = newMd.match(prepRe);
+  if (oldPrep && newPrep && oldPrep[1].trim() !== newPrep[1].trim()) {
+    // 如果旧文件的盘前准备有更多内容，保留
+    const oldLines = oldPrep[1].split('\n').filter(l => !l.match(/^- .+：$/));
+    if (oldLines.some(l => l.trim())) {
+      newMd = newMd.replace(newPrep[0], oldPrep[0]);
+    }
+  }
+  return newMd;
+}
+
 async function autoWriteReview(dateStr) {
   const vault = await getVault();
   if (!vault) return;
   const udir = getCurrentUser() ? getCurrentUser() + '/' : '';
+  const path = udir + `daily_reviews/${dateStr}.md`;
   try {
-    const md = buildReviewMarkdown(dateStr);
-    await writeFile(vault, udir + `daily_reviews/${dateStr}.md`, md);
+    const oldMd = await readFile(vault, path);
+    const newMd = buildReviewMarkdown(dateStr);
+    await writeFile(vault, path, mergeReviewMarkdown(newMd, oldMd));
   } catch {}
 }
 
